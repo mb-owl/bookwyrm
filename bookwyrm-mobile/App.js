@@ -1,7 +1,6 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-
 //screens
 import booklistscreen from './screens/booklistscreen';
 import bookdetailscreen from './screens/bookdetailscreen';
