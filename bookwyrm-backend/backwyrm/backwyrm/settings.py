@@ -27,6 +27,8 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+BACKEND_URL = 'BACKEND_URL/'
+
 
 # Application definition
 
