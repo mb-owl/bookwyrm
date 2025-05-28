@@ -27,7 +27,7 @@ useEffect(() => {
 const fetchBooks = async () => {
 	try {
 		setLoading(true);
-		const response = await fetch("https://127.0.0.1:8000/api/books");
+		const response = await fetch("BACKEND_URL/api/books");
 		const data = await response.json();
 		setBooks(data);
 	} catch (error) {
@@ -112,20 +112,6 @@ export default function BookListScreen({ route, navigation }) {
 useEffect(() => {
 	fetchBooks();
 }, []);
-
-const fetchBooks = async () => {
-	try {
-		setLoading(true);
-		let response = await fetch("https://api.example.com/books");
-		let data = await response.json();
-		setBooks(data);
-	} catch (error) {
-		console.error("Sorry, cannot fetch books at this time.", error);
-		//TO DO - IN REAL APP, LOAD CACHED DATA FROM ASYNC STORAGE IF OFFLINE
-	} finally {
-		setLoading(false);
-	}
-};
 
 // Navigate to detail screen on item press
 
