@@ -32,6 +32,10 @@ class Book(models.Model):
         null=True
     )  # rating of the book, optional
     book_notes = models.TextField(blank=True, null=True)  # notes about the book, optional
+    toBeRead = models.BooleanField(default=False)  # whether the book is to be read or not
+    is_read = models.BooleanField(default=False)  # whether the book has been read or not
+    shelved = models.BooleanField(default=False)  # whether the book is shelved or not
+    publication_date = models.DateField(blank=True, null=True)  # publication date of the book, optional
     cover = models.ImageField(upload_to='covers/', blank=True, null=True) #uploaded book cover, optional
     created_at = models.DateTimeField(auto_now_add=True) # when the book was added to the database
 

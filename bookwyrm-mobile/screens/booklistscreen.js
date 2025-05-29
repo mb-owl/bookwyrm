@@ -9,6 +9,8 @@ import {
 	Alert,
 	TextInput,
 	Image,
+	Modal,
+	Switch,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -17,30 +19,65 @@ export default function BookListScreen({ route, navigation }) {
 	const [loading, setLoading] = useState(true);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [sortKey, setSortKey] = useState("date"); // default sort by date
-	const { book } = route.params || {}; // book object passed from list
+	const { book, refresh } = route.params || {}; // book object and refresh flag passed from list
 
+	// Add a dependency on 'refresh' to trigger refetch when returning from delete
 	useEffect(() => {
-		// load cached data from AsyncStorage
-		AsyncStorage.getItem("books")
-			.then((savedData) => {
-				if (savedData) {
-					setBooks(JSON.parse(savedData));
-				}
-			})
-			.finally(() => {
-				// fetch latest from server after attempting to load cached data
-				fetchBooks();
-			});
-	}, []);
+		console.log("BookListScreen mounted or refresh triggered");
+		fetchBooks();
+	}, [refresh]); // This will re-run when the refresh parameter changes
 
 	const fetchBooks = async () => {
 		try {
 			setLoading(true);
-			const response = await fetch("http://127.0.0.1:8000/api/books");
+
+			// Add trailing slash for Django REST consistency
+			const url = "http://127.0.0.1:8000/api/books/";
+			console.log("Fetching books from:", url);
+
+			const response = await fetch(url, {
+				method: "GET",
+				headers: {
+					Accept: "application/json",
+				},
+			});
+
+			console.log("Response status:", response.status);
+
+			if (!response.ok) {
+				let errorText = "Unknown error";
+				try {
+					errorText = await response.text();
+				} catch (e) {
+					console.error("Error reading response text:", e);
+				}
+
+				console.error("Server error response:", errorText);
+				throw new Error(`API call failed: ${response.status} ${errorText}`);
+			}
+
 			const data = await response.json();
+			console.log("Books fetched successfully:", data.length, "books");
+
 			setBooks(data);
+
+			// Update cached data
+			AsyncStorage.setItem("books", JSON.stringify(data));
 		} catch (error) {
 			console.error("Error fetching books:", error);
+
+			// Try to load from cache as fallback
+			const cachedBooks = await AsyncStorage.getItem("books");
+			if (cachedBooks) {
+				console.log("Loading books from cache");
+				setBooks(JSON.parse(cachedBooks));
+			}
+
+			Alert.alert(
+				"Connection Error",
+				"Could not connect to the server. Please check your connection and server status.\n\nError: " +
+					error.message
+			);
 		} finally {
 			setLoading(false);
 		}
@@ -118,12 +155,61 @@ export default function BookListScreen({ route, navigation }) {
 				text: "Delete",
 				style: "destructive",
 				onPress: async () => {
-					// Call API to delete book
-					await fetch(`http://127.0.0.1:8000/api/books/${book.id}`, {
-						method: "DELETE",
-					});
-					// navigate back to book list and refresh state
-					navigation.goBack();
+					try {
+						// Show loading indicator
+						setLoading(true);
+
+						// Make sure the API endpoint has the trailing slash (Django often requires this)
+						const deleteUrl = `http://127.0.0.1:8000/api/books/${book.id}/`;
+						console.log("Attempting to delete book at URL:", deleteUrl);
+
+						// Call API to delete book
+						const response = await fetch(deleteUrl, {
+							method: "DELETE",
+							// Don't set Content-Type for DELETE requests
+						});
+
+						console.log("Delete response status:", response.status);
+
+						if (!response.ok) {
+							let errorText = "";
+							try {
+								errorText = await response.text();
+							} catch (e) {
+								errorText = "Unknown error";
+							}
+							console.error("Server response:", errorText);
+							throw new Error(`Delete failed: ${response.status} ${errorText}`);
+						}
+
+						// Success - update local state immediately
+						setBooks(books.filter((b) => b.id !== book.id));
+
+						// Update AsyncStorage
+						AsyncStorage.setItem(
+							"books",
+							JSON.stringify(books.filter((b) => b.id !== book.id))
+						);
+
+						Alert.alert("Success", "Book deleted successfully");
+
+						// Reset navigation to book list with refresh
+						navigation.reset({
+							index: 0,
+							routes: [
+								{ name: "BookListScreen", params: { refresh: Date.now() } },
+							],
+						});
+					} catch (error) {
+						console.error("Error deleting book:", error);
+						Alert.alert(
+							"Delete Failed",
+							"Could not delete the book. Please try again later. Error: " +
+								error.message
+						);
+					} finally {
+						setLoading(false);
+					}
 				},
 			},
 		]);
@@ -151,7 +237,8 @@ export default function BookListScreen({ route, navigation }) {
 
 				{book.cover ? (
 					<>
-						<Text style={{ fontSize: 12, color: "#666" }}>
+						{/* Debug text - can be removed once everything is working */}
+						<Text style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>
 							Path: {book.cover}
 						</Text>
 						<Image
@@ -193,18 +280,293 @@ export default function BookListScreen({ route, navigation }) {
 		);
 	};
 
+	// State for multi-selection mode
+	const [selectionMode, setSelectionMode] = useState(false);
+	const [selectedBooks, setSelectedBooks] = useState([]);
+	const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+
+	// Bulk edit state
+	const [bulkIsRead, setBulkIsRead] = useState(false);
+	const [bulkToBeRead, setBulkToBeRead] = useState(false);
+	const [bulkShelved, setBulkShelved] = useState(false);
+
+	// Toggle selection mode
+	const toggleSelectionMode = () => {
+		setSelectionMode(!selectionMode);
+		// Clear selections when exiting selection mode
+		if (selectionMode) setSelectedBooks([]);
+	};
+
+	// Toggle book selection
+	const toggleBookSelection = (book) => {
+		if (selectedBooks.some((selected) => selected.id === book.id)) {
+			setSelectedBooks(
+				selectedBooks.filter((selected) => selected.id !== book.id)
+			);
+		} else {
+			setSelectedBooks([...selectedBooks, book]);
+		}
+	};
+
+	// Handle bulk edit confirmation
+	const handleBulkEdit = async () => {
+		try {
+			setLoading(true);
+
+			// Make separate requests for each book
+			const updatePromises = selectedBooks.map((book) => {
+				const updateUrl = `http://127.0.0.1:8000/api/books/${book.id}/`;
+
+				const formData = new FormData();
+				formData.append("title", book.title);
+				formData.append("author", book.author);
+
+				// Only update the status fields we're bulk editing
+				formData.append("is_read", bulkIsRead ? "true" : "false");
+				formData.append("toBeRead", bulkToBeRead ? "true" : "false");
+				formData.append("shelved", bulkShelved ? "true" : "false");
+
+				return fetch(updateUrl, {
+					method: "PATCH", // Use PATCH to only update specific fields
+					body: formData,
+					headers: {
+						"Content-Type": "multipart/form-data",
+					},
+				});
+			});
+
+			// Wait for all updates to complete
+			await Promise.all(updatePromises);
+
+			// Close modal and refresh books
+			setShowBulkEditModal(false);
+			setSelectionMode(false);
+			setSelectedBooks([]);
+
+			// Show success message
+			Alert.alert("Success", `Updated ${selectedBooks.length} books`);
+
+			// Refresh the book list
+			fetchBooks();
+		} catch (error) {
+			console.error("Error during bulk edit:", error);
+			Alert.alert("Error", "Failed to update books. Please try again.");
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	// Handle bulk delete
+	const handleBulkDelete = () => {
+		Alert.alert(
+			"Delete Multiple Books",
+			`Are you sure you want to delete ${selectedBooks.length} books? This cannot be undone.`,
+			[
+				{ text: "Cancel", style: "cancel" },
+				{
+					text: "Delete",
+					style: "destructive",
+					onPress: async () => {
+						try {
+							setLoading(true);
+
+							// Make separate requests for each book deletion
+							const deletePromises = selectedBooks.map((book) => {
+								const deleteUrl = `http://127.0.0.1:8000/api/books/${book.id}/`;
+								return fetch(deleteUrl, { method: "DELETE" });
+							});
+
+							// Wait for all deletions to complete
+							await Promise.all(deletePromises);
+
+							// Update local state by removing deleted books
+							setBooks(
+								books.filter(
+									(book) =>
+										!selectedBooks.some((selected) => selected.id === book.id)
+								)
+							);
+
+							// Exit selection mode
+							setSelectionMode(false);
+							setSelectedBooks([]);
+
+							// Show success message
+							Alert.alert("Success", `Deleted ${selectedBooks.length} books`);
+
+							// Update cache
+							AsyncStorage.setItem(
+								"books",
+								JSON.stringify(
+									books.filter(
+										(book) =>
+											!selectedBooks.some((selected) => selected.id === book.id)
+									)
+								)
+							);
+						} catch (error) {
+							console.error("Error during bulk delete:", error);
+							Alert.alert("Error", "Failed to delete books. Please try again.");
+						} finally {
+							setLoading(false);
+						}
+					},
+				},
+			]
+		);
+	};
+
 	// Render for FlatList items
 	const renderItem = ({ item }) => (
 		<TouchableOpacity
-			style={styles.item}
-			onPress={() => openBookDetail(item)}
+			style={[
+				styles.item,
+				selectedBooks.some((book) => book.id === item.id) &&
+					styles.selectedItem,
+			]}
+			onPress={() => {
+				if (selectionMode) {
+					toggleBookSelection(item);
+				} else {
+					openBookDetail(item);
+				}
+			}}
+			onLongPress={() => {
+				if (!selectionMode) {
+					setSelectionMode(true);
+					toggleBookSelection(item);
+				}
+			}}
 			accessible={true}
 			accessibilityLabel={`Book: ${item.title}`}
 		>
-			<Text style={styles.title}>{item.title}</Text>
-			<Text style={styles.author}>{item.author}</Text>
+			<View style={styles.itemRow}>
+				{selectionMode && (
+					<View
+						style={[
+							styles.checkbox,
+							selectedBooks.some((book) => book.id === item.id) &&
+								styles.checkboxSelected,
+						]}
+					>
+						{selectedBooks.some((book) => book.id === item.id) && (
+							<Text style={styles.checkmark}>✓</Text>
+						)}
+					</View>
+				)}
+				<View style={styles.itemContent}>
+					<Text style={styles.title}>{item.title}</Text>
+					<Text style={styles.author}>{item.author}</Text>
+				</View>
+			</View>
 		</TouchableOpacity>
 	);
+
+	// Bulk Edit Modal
+	const renderBulkEditModal = () => (
+		<Modal
+			visible={showBulkEditModal}
+			transparent={true}
+			animationType="slide"
+			onRequestClose={() => setShowBulkEditModal(false)}
+		>
+			<View style={styles.modalOverlay}>
+				<View style={styles.modalContent}>
+					<Text style={styles.modalTitle}>
+						Edit {selectedBooks.length} Books
+					</Text>
+
+					<View style={styles.switchContainer}>
+						<Text style={styles.switchLabel}>Already Read:</Text>
+						<Switch
+							value={bulkIsRead}
+							onValueChange={setBulkIsRead}
+							trackColor={{ false: "#767577", true: "#81b0ff" }}
+							thumbColor={bulkIsRead ? "#f5dd4b" : "#f4f3f4"}
+						/>
+					</View>
+
+					<View style={styles.switchContainer}>
+						<Text style={styles.switchLabel}>To Be Read:</Text>
+						<Switch
+							value={bulkToBeRead}
+							onValueChange={setBulkToBeRead}
+							trackColor={{ false: "#767577", true: "#81b0ff" }}
+							thumbColor={bulkToBeRead ? "#f5dd4b" : "#f4f3f4"}
+						/>
+					</View>
+
+					<View style={styles.switchContainer}>
+						<Text style={styles.switchLabel}>On Bookshelf:</Text>
+						<Switch
+							value={bulkShelved}
+							onValueChange={setBulkShelved}
+							trackColor={{ false: "#767577", true: "#81b0ff" }}
+							thumbColor={bulkShelved ? "#f5dd4b" : "#f4f3f4"}
+						/>
+					</View>
+
+					<View style={styles.modalButtonRow}>
+						<TouchableOpacity
+							style={[styles.modalButton, styles.cancelButton]}
+							onPress={() => setShowBulkEditModal(false)}
+						>
+							<Text style={styles.modalButtonText}>Cancel</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={[styles.modalButton, styles.saveButton]}
+							onPress={handleBulkEdit}
+						>
+							<Text style={styles.modalButtonText}>Save Changes</Text>
+						</TouchableOpacity>
+					</View>
+				</View>
+			</View>
+		</Modal>
+	);
+
+	// Selection action bar
+	const renderSelectionBar = () => {
+		if (!selectionMode) return null;
+
+		return (
+			<View style={styles.selectionBar}>
+				<Text style={styles.selectionText}>
+					{selectedBooks.length} book{selectedBooks.length !== 1 ? "s" : ""}{" "}
+					selected
+				</Text>
+				<View style={styles.selectionButtons}>
+					<TouchableOpacity
+						style={[
+							styles.selectionButton,
+							selectedBooks.length === 0 && styles.disabledButton,
+						]}
+						onPress={() => setShowBulkEditModal(true)}
+						disabled={selectedBooks.length === 0}
+					>
+						<Text style={styles.selectionButtonText}>Edit</Text>
+					</TouchableOpacity>
+					<TouchableOpacity
+						style={[
+							styles.selectionButton,
+							styles.deleteButton,
+							selectedBooks.length === 0 && styles.disabledButton,
+						]}
+						onPress={handleBulkDelete}
+						disabled={selectedBooks.length === 0}
+					>
+						<Text style={styles.selectionButtonText}>Delete</Text>
+					</TouchableOpacity>
+					<TouchableOpacity
+						style={styles.selectionButton}
+						onPress={toggleSelectionMode}
+					>
+						<Text style={styles.selectionButtonText}>Cancel</Text>
+					</TouchableOpacity>
+				</View>
+			</View>
+		);
+	};
 
 	// Render book list or detail view based on route params
 	if (book) {
@@ -222,7 +584,17 @@ export default function BookListScreen({ route, navigation }) {
 
 	return (
 		<View style={styles.container}>
-			{renderSearchInput()}
+			<View style={styles.header}>
+				{renderSearchInput()}
+				<TouchableOpacity
+					style={styles.selectionModeButton}
+					onPress={toggleSelectionMode}
+				>
+					<Text style={styles.selectionModeButtonText}>
+						{selectionMode ? "Cancel" : "Select"}
+					</Text>
+				</TouchableOpacity>
+			</View>
 
 			<View style={styles.sortRow}>
 				<Text style={{ fontFamily: "Georgia" }}>Sort:</Text>
@@ -265,22 +637,31 @@ export default function BookListScreen({ route, navigation }) {
 					data={books}
 					renderItem={renderItem}
 					keyExtractor={(item) => item.id.toString()}
-					style={styles.bookList}
+					style={[styles.bookList, selectionMode && styles.selectionModeList]}
 				/>
 			)}
 
-			{/* Add a button to navigate to the book form screen */}
-			<TouchableOpacity
-				style={styles.addButton}
-				onPress={() => navigation.navigate("BookFormScreen")}
-				accessible={true}
-				accessibilityLabel="Time to start your next adventure! Add new books here."
-			>
-				<Text style={styles.buttonText}>Add Book</Text>
-			</TouchableOpacity>
+			{/* Render bulk edit modal */}
+			{renderBulkEditModal()}
+
+			{/* Render selection action bar */}
+			{renderSelectionBar()}
+
+			{/* Add button (hide during selection mode) */}
+			{!selectionMode && (
+				<TouchableOpacity
+					style={styles.addButton}
+					onPress={() => navigation.navigate("BookFormScreen")}
+					accessible={true}
+					accessibilityLabel="Time to start your next adventure! Add new books here."
+				>
+					<Text style={styles.buttonText}>Add Book</Text>
+				</TouchableOpacity>
+			)}
 		</View>
 	);
 }
+
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: "#FFF", padding: 16 },
 	label: { fontWeight: "bold", fontSize: 16, fontFamily: "Georgia" },
@@ -335,4 +716,147 @@ const styles = StyleSheet.create({
 	author: { fontSize: 14, color: "#666" },
 	emptyText: { textAlign: "center", marginTop: 20, fontStyle: "italic" },
 	noCoverText: { fontStyle: "italic", color: "#777", marginVertical: 16 },
+
+	// New styles for selection mode
+	header: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "space-between",
+		paddingRight: 8,
+	},
+	selectionModeButton: {
+		paddingHorizontal: 10,
+		paddingVertical: 6,
+		backgroundColor: "#f0f0f0",
+		borderRadius: 4,
+	},
+	selectionModeButtonText: {
+		color: "#007BFF",
+	},
+	itemRow: {
+		flexDirection: "row",
+		alignItems: "center",
+	},
+	itemContent: {
+		flex: 1,
+	},
+	checkbox: {
+		width: 24,
+		height: 24,
+		borderRadius: 12,
+		borderWidth: 2,
+		borderColor: "#ccc",
+		marginRight: 10,
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	checkboxSelected: {
+		borderColor: "#007BFF",
+		backgroundColor: "#007BFF",
+	},
+	checkmark: {
+		color: "white",
+		fontSize: 16,
+	},
+	selectedItem: {
+		backgroundColor: "rgba(0, 123, 255, 0.1)",
+	},
+	selectionBar: {
+		position: "absolute",
+		bottom: 0,
+		left: 0,
+		right: 0,
+		backgroundColor: "#fff",
+		borderTopWidth: 1,
+		borderTopColor: "#ccc",
+		padding: 10,
+		elevation: 5,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: -2 },
+		shadowOpacity: 0.1,
+		shadowRadius: 4,
+	},
+	selectionText: {
+		textAlign: "center",
+		marginBottom: 8,
+		fontSize: 16,
+		fontWeight: "bold",
+	},
+	selectionButtons: {
+		flexDirection: "row",
+		justifyContent: "space-around",
+	},
+	selectionButton: {
+		paddingVertical: 8,
+		paddingHorizontal: 12,
+		backgroundColor: "#007BFF",
+		borderRadius: 4,
+		minWidth: 80,
+		alignItems: "center",
+	},
+	selectionButtonText: {
+		color: "#fff",
+		fontWeight: "500",
+	},
+	disabledButton: {
+		opacity: 0.5,
+	},
+	selectionModeList: {
+		marginBottom: 80, // Extra space for the selection bar
+	},
+	modalOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0,0,0,0.5)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	modalContent: {
+		width: "85%",
+		backgroundColor: "white",
+		borderRadius: 10,
+		padding: 20,
+	},
+	modalTitle: {
+		fontSize: 18,
+		fontWeight: "bold",
+		marginBottom: 15,
+		textAlign: "center",
+	},
+	switchContainer: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		marginBottom: 15,
+		paddingVertical: 8,
+		borderBottomWidth: 1,
+		borderBottomColor: "#f0f0f0",
+	},
+	switchLabel: {
+		fontSize: 16,
+	},
+	modalButtonRow: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		marginTop: 20,
+	},
+	modalButton: {
+		paddingVertical: 10,
+		paddingHorizontal: 20,
+		borderRadius: 5,
+		minWidth: 100,
+		alignItems: "center",
+	},
+	cancelButton: {
+		backgroundColor: "#6c757d",
+	},
+	saveButton: {
+		backgroundColor: "#28a745",
+	},
+	deleteButton: {
+		backgroundColor: "#dc3545",
+	},
+	modalButtonText: {
+		color: "#fff",
+		fontSize: 16,
+	},
 });

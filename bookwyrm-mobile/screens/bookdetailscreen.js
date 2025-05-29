@@ -21,12 +21,51 @@ export default function BookDetailScreen({ route, navigation }) {
 			{
 				text: "Delete",
 				onPress: async () => {
-					// Call API to delete book
-					await fetch(`http://127.0.0.1:8000/api/books/${book.id}`, {
-						method: "DELETE",
-					});
-					// Navigate back to book list and refresh state
-					navigation.goBack();
+					try {
+						// Show deletion in progress
+
+						// Make sure the API endpoint has the trailing slash (Django often requires this)
+						const deleteUrl = `http://127.0.0.1:8000/api/books/${book.id}/`;
+						console.log("Attempting to delete book at URL:", deleteUrl);
+
+						// Call API to delete book
+						const response = await fetch(deleteUrl, {
+							method: "DELETE",
+							// Don't set Content-Type for DELETE requests
+							// as they typically don't have a body
+						});
+
+						console.log("Delete response status:", response.status);
+
+						if (!response.ok) {
+							let errorText = "";
+							try {
+								errorText = await response.text();
+							} catch (e) {
+								errorText = "Unknown error";
+							}
+							console.error("Server response:", errorText);
+							throw new Error(`Delete failed: ${response.status} ${errorText}`);
+						}
+
+						// Success - navigate back to book list and refresh
+						Alert.alert("Success", "Book deleted successfully");
+
+						// Navigate back and pass refresh parameter
+						navigation.reset({
+							index: 0,
+							routes: [
+								{ name: "BookListScreen", params: { refresh: Date.now() } },
+							],
+						});
+					} catch (error) {
+						console.error("Error deleting book:", error);
+						Alert.alert(
+							"Delete Failed",
+							"Could not delete the book. Please try again later. Error: " +
+								error.message
+						);
+					}
 				},
 			},
 		]);
@@ -45,32 +84,21 @@ export default function BookDetailScreen({ route, navigation }) {
 			<Text style={styles.value}>{book.author}</Text>
 
 			{book.cover ? (
-				<>
-					<Image
-						source={{
-							uri: book.cover.startsWith("http")
-								? book.cover
-								: `http://127.0.0.1:8000/api/media/covers/${book.cover
-										.split("/")
-										.pop()}`,
-						}}
-						style={styles.coverImage}
-						accessible={true}
-						accessibilityLabel={`Cover image of ${book.title}`}
-						onError={(e) =>
-							console.error("Image load error:", e.nativeEvent.error)
-						}
-					/>
-					{/* Fallback image in case the first one fails */}
-					<Image
-						source={{
-							uri: `http://127.0.0.1:8000/media/covers/${book.cover
-								.split("/")
-								.pop()}`,
-						}}
-						style={[styles.coverImage, { marginTop: 8 }]}
-					/>
-				</>
+				<Image
+					source={{
+						uri: book.cover.startsWith("http")
+							? book.cover
+							: `http://127.0.0.1:8000/api/media/covers/${book.cover
+									.split("/")
+									.pop()}`,
+					}}
+					style={styles.coverImage}
+					accessible={true}
+					accessibilityLabel={`Cover image of ${book.title}`}
+					onError={(e) =>
+						console.error("Image load error:", e.nativeEvent.error)
+					}
+				/>
 			) : (
 				<Text style={styles.noCoverText}>No cover image available</Text>
 			)}
