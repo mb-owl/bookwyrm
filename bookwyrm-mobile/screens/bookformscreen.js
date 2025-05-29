@@ -7,27 +7,28 @@
 // The user is alerted if there are any issues with image selection or form submission.
 // The screen is designed to be user-friendly, with clear labels and buttons for interaction.
 
+
 import React, { useState, useEffect } from "react";
 import {
-	View,
-	Text,
-	TextInput,
-	Image,
-	Button,
-	TouchableOpacity,
-	StyleSheet,
-	Alert,
+    View,
+    Text,
+    TextInput,
+    Image,
+    Button,
+    TouchableOpacity,
+    StyleSheet,
+    Alert,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
-export default function BookFormScreen({ navigation }) {
-	const editingBook = route.params?.book; //if passed we are editing
-	const [title, setTitle] = useState(editingBook ? editingBook.title : "");
-	const [author, setAuthor] = useState(editingBook ? editingBook.author : "");
-	const [coverImage, setCoverImage] = useState(
-		editingBook ? editingBook.coverImage : null
-	);
-	const [isLoading, setUploading] = useState(false);
+export default function BookFormScreen({ route, navigation }) {
+    const editingBook = route.params?.book; // Added missing route parameter
+    const [title, setTitle] = useState(editingBook ? editingBook.title : "");
+    const [author, setAuthor] = useState(editingBook ? editingBook.author : "");
+    const [coverImage, setCoverImage] = useState(
+        editingBook ? editingBook.coverImage : null
+    );
+    const [isLoading, setUploading] = useState(false);
 
 	//request permission for image library access
 	useEffect(() => {
@@ -98,9 +99,9 @@ export default function BookFormScreen({ navigation }) {
 				let errText = await response.text();
 				throw new Error(errText);
 			}
-			// If the request was successful, navigate back
-			navigation.navigate("BookList"); // Assuming you have a BookList screen to go back to
-		} catch (error) {
+            // If the request was successful, navigate back
+            navigation.navigate("BookList"); // Updated to match Stack.Screen name
+        } catch (error) {
 			console.error("Error saving book:", error);
 			Alert.alert(
 				"We had an issue adding this book to your bookshelves. Please try again."
