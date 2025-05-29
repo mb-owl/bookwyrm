@@ -40,9 +40,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'books',
-    'bookwyrm-mobile',
-    'bookwyrm',
-    'bookwyrm_api',
     'rest_framework',
     'corsheaders',
 ]
