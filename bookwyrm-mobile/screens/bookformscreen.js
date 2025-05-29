@@ -7,28 +7,27 @@
 // The user is alerted if there are any issues with image selection or form submission.
 // The screen is designed to be user-friendly, with clear labels and buttons for interaction.
 
-
 import React, { useState, useEffect } from "react";
 import {
-    View,
-    Text,
-    TextInput,
-    Image,
-    Button,
-    TouchableOpacity,
-    StyleSheet,
-    Alert,
+	View,
+	Text,
+	TextInput,
+	Image,
+	Button,
+	TouchableOpacity,
+	StyleSheet,
+	Alert,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
 export default function BookFormScreen({ route, navigation }) {
-    const editingBook = route.params?.book; // Added missing route parameter
-    const [title, setTitle] = useState(editingBook ? editingBook.title : "");
-    const [author, setAuthor] = useState(editingBook ? editingBook.author : "");
-    const [coverImage, setCoverImage] = useState(
-        editingBook ? editingBook.coverImage : null
-    );
-    const [isLoading, setUploading] = useState(false);
+	const editingBook = route.params?.book; // Added missing route parameter
+	const [title, setTitle] = useState(editingBook ? editingBook.title : "");
+	const [author, setAuthor] = useState(editingBook ? editingBook.author : "");
+	const [coverImage, setCoverImage] = useState(
+		editingBook ? editingBook.coverImage : null
+	);
+	const [uploading, setUploading] = useState(false);
 
 	//request permission for image library access
 	useEffect(() => {
@@ -68,42 +67,78 @@ export default function BookFormScreen({ route, navigation }) {
 			let formData = new FormData();
 			formData.append("title", title);
 			formData.append("author", author);
+
 			if (coverImage && !coverImage.canceled) {
-				//append the image file to the form data if selected
-				const uri = coverImage.uri;
-				const fileName = uri.split("/").pop();
-				const match = /\.(\w+)$/.exec(fileName);
-				const fileType = match ? `image/${match[1]}` : "image";
-				formData.append("coverImage", {
-					uri: uri,
-					name: fileName || "cover.jpg",
-					//default name if fileName is not available
-					type: fileType,
-				});
+				// Handle new Expo ImagePicker response format
+				let uri;
+
+				// Check if image is in the new format with assets array
+				if (coverImage.assets && coverImage.assets.length > 0) {
+					uri = coverImage.assets[0].uri;
+				}
+				// Fall back to old format if needed
+				else if (coverImage.uri) {
+					uri = coverImage.uri;
+				}
+
+				if (uri) {
+					const fileName = uri.split("/").pop();
+					const match = /\.(\w+)$/.exec(fileName);
+					const fileType = match ? `image/${match[1]}` : "image";
+
+					// Use 'cover' as the form field name to match backend expectations
+					formData.append("cover", {
+						uri: uri,
+						name: fileName || "cover.jpg",
+						type: fileType,
+					});
+
+					console.log("Adding image to form:", uri);
+
+					// Add a separate field to indicate the destination path
+					formData.append(
+						"coverPath",
+						"bookwyrm/bookwyrm-backend/bookwyrm/bookwyrm/media/covers"
+					);
+				}
 			}
 
-			const url = editingBook
-				? `BACKEND_URL/api/books/${editingBook.id}` //update existing book
-				: `BACKEND_URL/api/books/`; //create new book
+			// Replace BACKEND_URL with your actual server URL (include http:// or https://)
+			const baseUrl = "http://127.0.0.1:8000/api"; // Replace with your actual backend URL
 
-			const method = editingBook ? "PUT" : "POST"; //use PUT for updating, POST for creating
+			// Determine the URL for creating or updating a book
+			const url = editingBook
+				? `${baseUrl}/books/${editingBook.id}` // update existing book
+				: `${baseUrl}/books/`; // create new book
+
+			const method = editingBook ? "PUT" : "POST"; // use PUT for updating, POST for creating
+
+			console.log("Submitting to URL:", url);
+
 			let response = await fetch(url, {
 				method: method,
 				body: formData,
 				headers: {
 					"Content-Type": "multipart/form-data",
+					// Add extra header to signal server about upload directory
+					"X-Upload-Directory":
+						"bookwyrm/bookwyrm-backend/bookwyrm/bookwyrm/media/covers",
 				},
 			});
 			if (!response.ok) {
 				// If we get an error / 400 etc
 				let errText = await response.text();
+				console.error("Server response:", errText);
 				throw new Error(errText);
 			}
-            // If the request was successful, navigate back
-            navigation.navigate("BookList"); // Updated to match Stack.Screen name
-        } catch (error) {
+
+			Alert.alert("Success", "Book saved successfully!");
+			// If the request was successful, navigate back
+			navigation.navigate("BookListScreen"); // Updated to match Stack.Screen name
+		} catch (error) {
 			console.error("Error saving book:", error);
 			Alert.alert(
+				"Error",
 				"We had an issue adding this book to your bookshelves. Please try again."
 			);
 		} finally {
@@ -135,7 +170,15 @@ export default function BookFormScreen({ route, navigation }) {
 
 			{/* If coverImage is set, display the image preview */}
 			{coverImage && !coverImage.canceled && (
-				<Image source={{ uri: coverImage.uri }} style={styles.imagePreview} />
+				<Image
+					source={{
+						uri:
+							coverImage.assets && coverImage.assets.length > 0
+								? coverImage.assets[0].uri
+								: coverImage.uri,
+					}}
+					style={styles.imagePreview}
+				/>
 			)}
 			<Button
 				title={

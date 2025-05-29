@@ -36,7 +36,7 @@ export default function BookListScreen({ route, navigation }) {
 	const fetchBooks = async () => {
 		try {
 			setLoading(true);
-			const response = await fetch("BACKEND_URL/api/books");
+			const response = await fetch("http://127.0.0.1:8000/api/books");
 			const data = await response.json();
 			setBooks(data);
 		} catch (error) {
@@ -119,7 +119,9 @@ export default function BookListScreen({ route, navigation }) {
 				style: "destructive",
 				onPress: async () => {
 					// Call API to delete book
-					await fetch(`BACKEND_URL/api/books/${book.id}`, { method: "DELETE" });
+					await fetch(`http://127.0.0.1:8000/api/books/${book.id}`, {
+						method: "DELETE",
+					});
 					// navigate back to book list and refresh state
 					navigation.goBack();
 				},
@@ -148,12 +150,26 @@ export default function BookListScreen({ route, navigation }) {
 				<Text style={styles.value}>{book.author}</Text>
 
 				{book.cover ? (
-					<Image
-						source={{ uri: `BACKEND_URL${book.cover}` }}
-						style={styles.coverImage}
-						accessible={true}
-						accessibilityLabel={`Cover image of ${book.title}`}
-					/>
+					<>
+						<Text style={{ fontSize: 12, color: "#666" }}>
+							Path: {book.cover}
+						</Text>
+						<Image
+							source={{
+								uri: book.cover.startsWith("http")
+									? book.cover
+									: `http://127.0.0.1:8000/api/media/covers/${book.cover
+											.split("/")
+											.pop()}`,
+							}}
+							style={styles.coverImage}
+							accessible={true}
+							accessibilityLabel={`Cover image of ${book.title}`}
+							onError={(e) =>
+								console.error("Image load error:", e.nativeEvent.error)
+							}
+						/>
+					</>
 				) : (
 					<Text style={styles.noCoverText}>No cover image available</Text>
 				)}
@@ -249,12 +265,13 @@ export default function BookListScreen({ route, navigation }) {
 					data={books}
 					renderItem={renderItem}
 					keyExtractor={(item) => item.id.toString()}
+					style={styles.bookList}
 				/>
 			)}
 
 			{/* Add a button to navigate to the book form screen */}
 			<TouchableOpacity
-				style={styles.button}
+				style={styles.addButton}
 				onPress={() => navigation.navigate("BookFormScreen")}
 				accessible={true}
 				accessibilityLabel="Time to start your next adventure! Add new books here."
@@ -264,7 +281,6 @@ export default function BookListScreen({ route, navigation }) {
 		</View>
 	);
 }
-
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: "#FFF", padding: 16 },
 	label: { fontWeight: "bold", fontSize: 16, fontFamily: "Georgia" },
@@ -277,8 +293,27 @@ const styles = StyleSheet.create({
 		marginTop: 24,
 	},
 	button: { padding: 12, borderRadius: 4, minWidth: 100, alignItems: "center" },
+	addButton: {
+		padding: 12,
+		borderRadius: 4,
+		minWidth: 100,
+		alignItems: "center",
+		backgroundColor: "#4CAF50",
+		position: "absolute",
+		bottom: 20,
+		alignSelf: "center",
+		elevation: 5,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.25,
+		shadowRadius: 3.84,
+	},
+	bookList: {
+		marginBottom: 60, // Make space for the add button
+	},
 	editButton: { backgroundColor: "#2196F3" },
 	deleteButton: { backgroundColor: "#f44336" },
+	buttonText: { color: "#FFF", fontSize: 16 },
 	buttonText: { color: "#FFF", fontSize: 16 },
 	sortRow: {
 		flexDirection: "row",
