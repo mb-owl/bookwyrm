@@ -14,6 +14,13 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// Define IP addresses for different environments
+const LOCAL_IP_ADDRESS = "http://192.168.0.57:8000/api";
+const BASE_URL = "http://127.0.0.1:8000/api";
+
+// Use BASE_URL for API calls
+const API_BASE_URL = BASE_URL;
+
 export default function BookListScreen({ route, navigation }) {
 	const [books, setBooks] = useState([]);
 	const [loading, setLoading] = useState(true);
@@ -32,7 +39,7 @@ export default function BookListScreen({ route, navigation }) {
 			setLoading(true);
 
 			// Add trailing slash for Django REST consistency
-			const url = "http://127.0.0.1:8000/api/books/";
+			const url = `${API_BASE_URL}/books/`;
 			console.log("Fetching books from:", url);
 
 			const response = await fetch(url, {
@@ -160,7 +167,7 @@ export default function BookListScreen({ route, navigation }) {
 						setLoading(true);
 
 						// Make sure the API endpoint has the trailing slash (Django often requires this)
-						const deleteUrl = `http://127.0.0.1:8000/api/books/${book.id}/`;
+						const deleteUrl = `${API_BASE_URL}/books/${book.id}/`;
 						console.log("Attempting to delete book at URL:", deleteUrl);
 
 						// Call API to delete book
@@ -222,7 +229,7 @@ export default function BookListScreen({ route, navigation }) {
 	// Navigate to detail screen on item press
 	const openBookDetail = (book) => {
 		navigation.navigate("BookDetailScreen", { book });
-	}; // possible error with BookDetailScreen vs BookDetail (tutorial uses BookDetail)
+	}; // possible error with BookDetailScreen vs BookDetail)
 
 	const renderBookDetail = () => {
 		if (!book) return null;
@@ -245,7 +252,7 @@ export default function BookListScreen({ route, navigation }) {
 							source={{
 								uri: book.cover.startsWith("http")
 									? book.cover
-									: `http://127.0.0.1:8000/api/media/covers/${book.cover
+									: `${API_BASE_URL}/media/covers/${book.cover
 											.split("/")
 											.pop()}`,
 							}}
@@ -315,7 +322,7 @@ export default function BookListScreen({ route, navigation }) {
 
 			// Make separate requests for each book
 			const updatePromises = selectedBooks.map((book) => {
-				const updateUrl = `http://127.0.0.1:8000/api/books/${book.id}/`;
+				const updateUrl = `${API_BASE_URL}/books/${book.id}/`;
 
 				const formData = new FormData();
 				formData.append("title", book.title);
@@ -372,7 +379,7 @@ export default function BookListScreen({ route, navigation }) {
 
 							// Make separate requests for each book deletion
 							const deletePromises = selectedBooks.map((book) => {
-								const deleteUrl = `http://127.0.0.1:8000/api/books/${book.id}/`;
+								const deleteUrl = `${API_BASE_URL}/books/${book.id}/`;
 								return fetch(deleteUrl, { method: "DELETE" });
 							});
 

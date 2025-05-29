@@ -8,6 +8,13 @@ import {
 	Alert,
 } from "react-native";
 
+// Define IP addresses for different environments
+const LOCAL_IP_ADDRESS = "http://192.168.0.57:8000/api";
+const BASE_URL = "http://127.0.0.1:8000/api";
+
+// Use BASE_URL for API calls
+const API_BASE_URL = BASE_URL;
+
 export default function BookDetailScreen({ route, navigation }) {
 	const { book } = route.params; // book object passed from list
 
@@ -25,7 +32,7 @@ export default function BookDetailScreen({ route, navigation }) {
 						// Show deletion in progress
 
 						// Make sure the API endpoint has the trailing slash (Django often requires this)
-						const deleteUrl = `http://127.0.0.1:8000/api/books/${book.id}/`;
+						const deleteUrl = `${API_BASE_URL}/books/${book.id}/`;
 						console.log("Attempting to delete book at URL:", deleteUrl);
 
 						// Call API to delete book
@@ -88,9 +95,7 @@ export default function BookDetailScreen({ route, navigation }) {
 					source={{
 						uri: book.cover.startsWith("http")
 							? book.cover
-							: `http://127.0.0.1:8000/api/media/covers/${book.cover
-									.split("/")
-									.pop()}`,
+							: `${API_BASE_URL}/media/covers/${book.cover.split("/").pop()}`,
 					}}
 					style={styles.coverImage}
 					accessible={true}

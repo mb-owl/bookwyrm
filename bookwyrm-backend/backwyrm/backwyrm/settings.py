@@ -25,7 +25,8 @@ SECRET_KEY = 'django-insecure-#hwc36lsm@2vj#2p)k4pm@-u#3bi#(e_5gal@efxh&p84r%uj2
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# Allow both localhost and specific IP address
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.0.57']
 
 # Application definition
 
@@ -124,8 +125,24 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Ensure CORS is properly configured
 CORS_ALLOW_ALL_ORIGINS = True
+# For more specific control, you can use:
+# CORS_ALLOWED_ORIGINS = [
+#     "http://localhost:19006",  # Add your React Native Expo address
+#     "http://192.168.1.XXX:19006",  # Add your IP with Expo port
+# ]
 
+# For handling file uploads properly
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Add these lines for better handling of multipart form data
+REST_FRAMEWORK = {
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
+    ],
+}
 

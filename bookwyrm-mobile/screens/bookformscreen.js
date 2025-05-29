@@ -28,8 +28,15 @@ import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
 
+// Define IP addresses for different environments
+const LOCAL_IP_ADDRESS = "http://192.168.0.57:8000/api";
+const BASE_URL = "http://127.0.0.1:8000/api";
+
+// Use BASE_URL for API calls
+const API_BASE_URL = BASE_URL;
+
 export default function BookFormScreen({ route, navigation }) {
-	const editingBook = route.params?.book; // Added missing route parameter
+	const editingBook = route.params?.book;
 	const [title, setTitle] = useState(editingBook ? editingBook.title : "");
 	const [author, setAuthor] = useState(editingBook ? editingBook.author : "");
 	const [genre, setGenre] = useState(
@@ -146,6 +153,27 @@ export default function BookFormScreen({ route, navigation }) {
 		}
 	};
 
+	// Extract vibes from book_notes if it exists and contains the marker
+	const extractVibesAndThoughts = (notes) => {
+		if (!notes) return { vibes: "", thoughts: "" };
+
+		// Check if the notes contains our separator marker
+		if (notes.includes("--VIBES_SEPARATOR--")) {
+			const [vibes, thoughts] = notes.split("--VIBES_SEPARATOR--");
+			return { vibes: vibes.trim(), thoughts: thoughts.trim() };
+		}
+
+		// If no separator found, assume it's all thoughts
+		return { vibes: "", thoughts: notes };
+	};
+
+	const { vibes: initialVibes, thoughts: initialThoughts } =
+		extractVibesAndThoughts(editingBook ? editingBook.book_notes : "");
+
+	const [vibes, setVibes] = useState(initialVibes);
+	const [thoughts, setThoughts] = useState(initialThoughts);
+
+	// Handle the form submission to match Django model fields exactly
 	const handleSubmit = async () => {
 		if (!title || !author) {
 			Alert.alert("Title and author are required fields.");
@@ -158,26 +186,31 @@ export default function BookFormScreen({ route, navigation }) {
 			formData.append("title", title);
 			formData.append("author", author);
 
-			// Join multiple genres into a comma-separated string
+			// Match the exact field name in models.py - singular 'genre' not 'genres'
 			formData.append("genre", genres.join(","));
-			formData.append("book_notes", bookNotes);
 
-			// Format rating to have 2 decimal places
+			// Combine vibes and thoughts into book_notes with a separator
+			const combinedNotes = vibes
+				? `${vibes}--VIBES_SEPARATOR--${thoughts}`
+				: thoughts;
+
+			formData.append("book_notes", combinedNotes);
+
+			// Format rating to have 2 decimal places, ensuring it matches the DecimalField
 			const formattedRating = parseFloat(rating).toFixed(2);
 			formData.append("rating", formattedRating);
 
-			// Add emoji rating
-			formData.append("emoji", emoji);
-
+			// Boolean fields - match exact Django model field names
 			formData.append("is_read", isRead ? "true" : "false");
-			formData.append("toBeRead", toBeRead ? "true" : "false");
+			formData.append("toBeRead", toBeRead ? "true" : "false"); // Match camelCase as in model
 			formData.append("shelved", shelved ? "true" : "false");
 
-			// Create a date object for the selected year (Jan 1st)
+			// Create a proper ISO date string for Django DateField
 			const dateObj = new Date(publicationYear, 0, 1);
-			const formattedDate = dateObj.toISOString().split("T")[0];
+			const formattedDate = dateObj.toISOString().split("T")[0]; // YYYY-MM-DD
 			formData.append("publication_date", formattedDate);
 
+			// Handle cover image - the field name in models.py is 'cover'
 			if (coverImage && !coverImage.canceled) {
 				// Handle new Expo ImagePicker response format
 				let uri;
@@ -196,7 +229,7 @@ export default function BookFormScreen({ route, navigation }) {
 					const match = /\.(\w+)$/.exec(fileName);
 					const fileType = match ? `image/${match[1]}` : "image";
 
-					// Use 'cover' as the form field name to match backend expectations
+					// Use 'cover' field name to match Django model
 					formData.append("cover", {
 						uri: uri,
 						name: fileName || "cover.jpg",
@@ -204,14 +237,11 @@ export default function BookFormScreen({ route, navigation }) {
 					});
 
 					console.log("Adding image to form:", uri);
-
-					// Add a separate field to indicate the destination path
-					formData.append("coverPath", "api/media/covers");
 				}
 			}
 
-			// Replace BACKEND_URL with your actual server URL (include http:// or https://)
-			const baseUrl = "http://127.0.0.1:8000/api"; // Replace with your actual backend URL
+			// Replace with consistent API_BASE_URL
+			const baseUrl = API_BASE_URL;
 
 			// Determine the URL for creating or updating a book - add trailing slash for Django
 			const url = editingBook
@@ -221,16 +251,27 @@ export default function BookFormScreen({ route, navigation }) {
 			const method = editingBook ? "PUT" : "POST"; // use PUT for updating, POST for creating
 
 			console.log("Submitting to URL:", url, "Method:", method);
-			console.log("Form data:", JSON.stringify([...formData.entries()]));
+
+			// Improved debugging - log form data entries
+			const formDataEntries = [...formData.entries()];
+			console.log(
+				"Form data entries:",
+				formDataEntries.map((entry) => {
+					// Don't log the full image data
+					if (typeof entry[1] === "object" && entry[0] === "cover") {
+						return [entry[0], "Image data (not shown)"];
+					}
+					return entry;
+				})
+			);
 
 			let response = await fetch(url, {
 				method: method,
 				body: formData,
 				headers: {
-					"Content-Type": "multipart/form-data",
-					// Add extra header to signal server about upload directory
-					"X-Upload-Directory":
-						"bookwyrm/bookwyrm-backend/bookwyrm/bookwyrm/media/covers",
+					// Don't specify Content-Type for multipart/form-data
+					// React Native will set the boundary automatically
+					Accept: "application/json",
 				},
 			});
 
@@ -238,9 +279,17 @@ export default function BookFormScreen({ route, navigation }) {
 
 			if (!response.ok) {
 				// If we get an error / 400 etc
-				let errText = await response.text();
-				console.error("Server response:", errText);
-				throw new Error(errText);
+				let errText = "";
+				try {
+					// Try to parse as JSON first
+					const errJson = await response.json();
+					errText = JSON.stringify(errJson);
+				} catch (jsonError) {
+					// If not JSON, get as text
+					errText = await response.text();
+				}
+				console.error("Server response error:", errText);
+				throw new Error(`Server error (${response.status}): ${errText}`);
 			}
 
 			Alert.alert("Success", "Book saved successfully!");
@@ -249,8 +298,12 @@ export default function BookFormScreen({ route, navigation }) {
 		} catch (error) {
 			console.error("Error saving book:", error);
 			Alert.alert(
-				"Error",
-				"We had an issue adding this book to your bookshelves. Please try again. Error: " +
+				"Network Error",
+				"Failed to connect to the server. Please check:\n\n" +
+					"1. Your server is running\n" +
+					"2. You're connected to the same network\n" +
+					"3. The API URL is correct\n\n" +
+					"Error details: " +
 					error.message
 			);
 		} finally {
@@ -309,28 +362,39 @@ export default function BookFormScreen({ route, navigation }) {
 			cleanedText = parts[0] + "." + parts.slice(1).join("");
 		}
 
-		// Prevent values over 5
-		if (parseFloat(cleanedText) > 5) {
-			cleanedText = "5";
-		}
-
-		// Update the rating input state
+		// Store the input text first
 		setRatingInput(cleanedText);
 
-		// Only update the actual rating value if we have a valid number
+		// Then parse and apply the rating value if valid
+		// Only if we have a valid number to parse
 		if (cleanedText !== "" && cleanedText !== ".") {
-			setRating(parseFloat(cleanedText));
+			const numValue = parseFloat(cleanedText);
+			// Check if it's a valid number and <= 5
+			if (!isNaN(numValue)) {
+				// Only apply the 5 max limit when the input is complete
+				const limitedValue = numValue > 5 ? 5 : numValue;
+				setRating(limitedValue);
+			}
 		} else {
-			// If input is empty or just a decimal, set rating to 0
+			// Empty input or just a decimal point
 			setRating(0);
 		}
 	};
 
-	// Handle focus on rating input
+	// Handle focus on rating input - don't use toString which can cause issues
 	const handleRatingFocus = () => {
 		setIsEditingRating(true);
-		// When focusing, show the raw value for easier editing
-		setRatingInput(rating.toString());
+
+		// Clear the input or set to current rating value without formatting
+		if (rating === 0) {
+			setRatingInput("");
+		} else {
+			// Remove trailing zeros for cleaner editing
+			const ratingStr = rating.toString();
+			setRatingInput(
+				ratingStr.endsWith(".00") ? ratingStr.slice(0, -3) : ratingStr
+			);
+		}
 	};
 
 	// Handle blur on rating input
@@ -372,13 +436,33 @@ export default function BookFormScreen({ route, navigation }) {
 		(_, i) => currentYear - i
 	);
 
+	// Simple input change handlers without search functionality
+	const handleTitleChange = (text) => {
+		setTitle(text);
+	};
+
+	const handleAuthorChange = (text) => {
+		setAuthor(text);
+	};
+
+	// Genre selection logic - improved to handle empty states and defaults
+	useEffect(() => {
+		if (editingBook && editingBook.genre) {
+			const initialGenres = editingBook.genre.split(",").map((g) => g.trim());
+			setGenres(initialGenres);
+		} else {
+			// Default to fiction if no genres are set
+			setGenres(["fiction"]);
+		}
+	}, [editingBook]);
+
 	return (
 		<ScrollView style={styles.container}>
 			<Text style={styles.label}>Title:</Text>
 			<TextInput
 				style={styles.input}
 				value={title}
-				onChangeText={setTitle}
+				onChangeText={handleTitleChange}
 				placeholder="Book title"
 			/>
 
@@ -386,7 +470,7 @@ export default function BookFormScreen({ route, navigation }) {
 			<TextInput
 				style={styles.input}
 				value={author}
-				onChangeText={setAuthor}
+				onChangeText={handleAuthorChange}
 				placeholder="Author name(s)"
 			/>
 
@@ -441,6 +525,19 @@ export default function BookFormScreen({ route, navigation }) {
 					</View>
 				</View>
 			</Modal>
+
+			<View style={styles.sectionSpacer} />
+
+			{/* Add Vibes field below genres */}
+			<Text style={[styles.label, { color: "#007BFF" }]}>Vibes:</Text>
+			<TextInput
+				style={[styles.input, styles.textArea]}
+				value={vibes}
+				onChangeText={setVibes}
+				placeholder="Brief synopsis or description of the book's vibe..."
+				multiline
+				numberOfLines={3}
+			/>
 
 			<View style={styles.sectionSpacer} />
 
@@ -666,12 +763,12 @@ export default function BookFormScreen({ route, navigation }) {
 				/>
 			</View>
 
-			<Text style={styles.label}>Notes:</Text>
+			<Text style={styles.label}>My thoughts:</Text>
 			<TextInput
 				style={[styles.input, styles.textArea]}
-				value={bookNotes}
-				onChangeText={setBookNotes}
-				placeholder="Your thoughts on this book..."
+				value={thoughts}
+				onChangeText={setThoughts}
+				placeholder="Your personal thoughts on this book..."
 				multiline
 				numberOfLines={4}
 			/>
@@ -710,6 +807,14 @@ export default function BookFormScreen({ route, navigation }) {
 			/>
 
 			<View style={styles.spacer} />
+
+			{/* Debug info - only visible in development mode */}
+			{__DEV__ && (
+				<View style={styles.debugContainer}>
+					<Text style={styles.debugTitle}>Debug Info</Text>
+					<Text style={styles.debugText}>Server API: {API_BASE_URL}</Text>
+				</View>
+			)}
 		</ScrollView>
 	);
 }
@@ -979,5 +1084,99 @@ const styles = StyleSheet.create({
 	selectedYearText: {
 		fontWeight: "bold",
 		color: "#007BFF",
+	},
+	searchContainer: {
+		position: "relative",
+		marginBottom: 16,
+	},
+	searchIndicator: {
+		position: "absolute",
+		right: 10,
+		top: 10,
+	},
+	searchResultsContainer: {
+		marginBottom: 16,
+		borderWidth: 1,
+		borderColor: "#ccc",
+		borderRadius: 4,
+		backgroundColor: "#fff",
+		elevation: 5,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.25,
+		shadowRadius: 3.84,
+		zIndex: 999,
+	},
+	searchResultsTitle: {
+		fontSize: 14,
+		fontWeight: "500",
+		padding: 8,
+		backgroundColor: "#f8f8f8",
+		borderBottomWidth: 1,
+		borderBottomColor: "#eee",
+	},
+	searchResultsList: {
+		maxHeight: 300,
+	},
+	searchResultItem: {
+		padding: 12,
+		borderBottomWidth: 1,
+		borderBottomColor: "#eee",
+	},
+	searchResultContent: {
+		flexDirection: "row",
+		alignItems: "center",
+	},
+	resultThumbnail: {
+		width: 40,
+		height: 60,
+		marginRight: 10,
+	},
+	noThumbnail: {
+		width: 40,
+		height: 60,
+		marginRight: 10,
+		backgroundColor: "#f0f0f0",
+		justifyContent: "center",
+		alignItems: "center",
+		borderRadius: 4,
+	},
+	noThumbnailText: {
+		fontSize: 10,
+		color: "#999",
+	},
+	resultTextContainer: {
+		flex: 1,
+	},
+	resultTitle: {
+		fontSize: 16,
+		fontWeight: "500",
+		marginBottom: 4,
+	},
+	resultAuthor: {
+		fontSize: 14,
+		color: "#666",
+		marginBottom: 2,
+	},
+	resultYear: {
+		fontSize: 12,
+		color: "#888",
+	},
+	debugContainer: {
+		marginTop: 20,
+		padding: 10,
+		backgroundColor: "#f0f0f0",
+		borderRadius: 5,
+		borderWidth: 1,
+		borderColor: "#ddd",
+	},
+	debugTitle: {
+		fontWeight: "bold",
+		marginBottom: 5,
+	},
+	debugText: {
+		fontSize: 12,
+		color: "#666",
+		marginBottom: 3,
 	},
 });
