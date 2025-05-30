@@ -31,6 +31,7 @@ import HamburgerMenu from "../components/HamburgerMenu";
 const BOOK_SEARCH_API = "https://openlibrary.org/search.json";
 
 export default function BookFormScreen({ route, navigation }) {
+	// Basic book information
 	const editingBook = route.params?.book;
 	const [title, setTitle] = useState(editingBook ? editingBook.title : "");
 	const [author, setAuthor] = useState(editingBook ? editingBook.author : "");
@@ -39,7 +40,8 @@ export default function BookFormScreen({ route, navigation }) {
 	const [bookNotes, setBookNotes] = useState(
 		editingBook ? editingBook.book_notes : ""
 	);
-	// Add the missing favorite state variable here
+
+	// Reading status fields
 	const [favorite, setFavorite] = useState(
 		editingBook ? editingBook.favorite : false
 	);
@@ -52,6 +54,17 @@ export default function BookFormScreen({ route, navigation }) {
 	const [recommendedToMe, setRecommendedToMe] = useState(
 		editingBook ? editingBook.recommended_to_me : false
 	);
+	const [isRead, setIsRead] = useState(
+		editingBook ? editingBook.is_read : false
+	);
+	const [toBeRead, setToBeRead] = useState(
+		editingBook ? editingBook.toBeRead : false
+	);
+	const [shelved, setShelved] = useState(
+		editingBook ? editingBook.shelved : false
+	);
+
+	// Rating fields
 	const [rating, setRating] = useState(
 		editingBook ? editingBook.rating || 0 : 0
 	);
@@ -63,23 +76,37 @@ export default function BookFormScreen({ route, navigation }) {
 			: "0"
 	);
 	const [isEditingRating, setIsEditingRating] = useState(false);
-	const [isRead, setIsRead] = useState(
-		editingBook ? editingBook.is_read : false
-	);
-	const [toBeRead, setToBeRead] = useState(
-		editingBook ? editingBook.toBeRead : false
-	);
-	const [shelved, setShelved] = useState(
-		editingBook ? editingBook.shelved : false
-	);
+
+	// Additional metadata
 	const [publicationYear, setPublicationYear] = useState(
 		editingBook && editingBook.publication_date
 			? new Date(editingBook.publication_date).getFullYear()
 			: new Date().getFullYear()
 	);
+	const [isbn, setIsbn] = useState(editingBook ? editingBook.isbn : "");
+	const [publisher, setPublisher] = useState(
+		editingBook ? editingBook.publisher : ""
+	);
+	const [language, setLanguage] = useState(
+		editingBook ? editingBook.language : ""
+	);
+	const [pageCount, setPageCount] = useState(
+		editingBook && editingBook.page_count
+			? editingBook.page_count.toString()
+			: ""
+	);
+	const [numberOfChapters, setNumberOfChapters] = useState(
+		editingBook && editingBook.number_of_chapters
+			? editingBook.number_of_chapters.toString()
+			: ""
+	);
+
+	// Photos
 	const [myBookPhotos, setMyBookPhotos] = useState(
 		editingBook ? editingBook.myBookPhotos || [] : []
 	);
+
+	// UI state
 	const [uploading, setUploading] = useState(false);
 	const [showYearModal, setShowYearModal] = useState(false);
 	const [showGenreModal, setShowGenreModal] = useState(false);
@@ -296,7 +323,7 @@ export default function BookFormScreen({ route, navigation }) {
 				const encodedQuery = encodeURIComponent(query);
 
 				// Enhanced URL to get more book information including descriptions
-				const url = `${BOOK_SEARCH_API}?q=${encodedQuery}&limit=5&fields=key,title,author_name,first_publish_year,cover_i,description,subject,first_sentence`;
+				const url = `${BOOK_SEARCH_API}?q=${encodedQuery}&limit=5&fields=key,title,author_name,first_publish_year,cover_i,description,subject,first_sentence,publisher,isbn,language,number_of_pages,oclc,lccn`;
 
 				const response = await fetch(url);
 
@@ -345,6 +372,12 @@ export default function BookFormScreen({ route, navigation }) {
 								description: description,
 								firstSentence: firstSentence,
 								subject: book.subject || [],
+								isbn: book.isbn || [],
+								publisher: book.publisher || [],
+								language: book.language || [],
+								number_of_pages: book.number_of_pages,
+								oclc: book.oclc || [],
+								lccn: book.lccn || [],
 							};
 						})
 					);
@@ -637,13 +670,372 @@ export default function BookFormScreen({ route, navigation }) {
 		return warnings;
 	};
 
-	// Handle selection of a book from search results
-	const selectBook = (book) => {
+	// Enhanced function to fetch book details after selection
+	const fetchBookDetails = async (olKey) => {
+		if (!olKey) return null;
+
+		try {
+			console.log("Fetching detailed book info from OpenLibrary:", olKey);
+			const workUrl = `https://openlibrary.org${olKey}.json`;
+			const response = await fetch(workUrl);
+
+			if (!response.ok) {
+				console.log("Error fetching book details:", response.status);
+				return null;
+			}
+
+			const data = await response.json();
+			console.log(
+				"Received book details:",
+				JSON.stringify(data).substring(0, 200) + "..."
+			);
+
+			// IMPROVED: Extract original language information if available in the work data
+			if (data.original_languages && data.original_languages.length > 0) {
+				// This is the most reliable source for original publishing language
+				const langKey = data.original_languages[0];
+				console.log("Found original language key in work data:", langKey);
+
+				// Extract language code from key (e.g., /languages/eng -> eng)
+				const langCode = langKey.split("/").pop();
+				data.original_language_code = langCode;
+			} else if (data.languages && data.languages.length > 0) {
+				// If no original_languages, use the first language listed
+				const langKey = data.languages[0];
+				console.log("Found language key in work data:", langKey);
+
+				// Extract language code from key
+				const langCode =
+					typeof langKey === "string" ? langKey.split("/").pop() : langKey;
+				data.original_language_code = langCode;
+			}
+
+			// IMPROVED: Check multiple potential sources for chapter count
+			if (data.number_of_chapters) {
+				console.log(
+					"Found explicit number of chapters:",
+					data.number_of_chapters
+				);
+			} else if (
+				data.table_of_contents &&
+				Array.isArray(data.table_of_contents)
+			) {
+				// Count chapters from table of contents
+				const chapters = data.table_of_contents.filter(
+					(item) =>
+						(item.title && item.title.toLowerCase().includes("chapter")) ||
+						(item.type && item.type === "chapter")
+				);
+
+				if (chapters.length > 0) {
+					console.log(
+						"Estimated number of chapters from TOC:",
+						chapters.length
+					);
+					data.number_of_chapters = chapters.length;
+				}
+			} else if (data.excerpts && data.excerpts.length > 0) {
+				// Sometimes excerpt text mentions "N chapters"
+				for (const excerpt of data.excerpts) {
+					if (excerpt.text) {
+						const chapterMatch = excerpt.text.match(/(\d+)\s+chapters/i);
+						if (chapterMatch && chapterMatch[1]) {
+							console.log("Found chapter count in excerpt:", chapterMatch[1]);
+							data.number_of_chapters = parseInt(chapterMatch[1]);
+							break;
+						}
+					}
+				}
+			}
+
+			return data;
+		} catch (error) {
+			console.log("Error in fetchBookDetails:", error);
+			return null;
+		}
+	};
+
+	// Enhanced function to fetch edition details
+	const fetchEditionDetails = async (isbn) => {
+		if (!isbn) return null;
+
+		try {
+			console.log("Fetching edition details for ISBN:", isbn);
+			// IMPROVED: Use jscmd=details for more comprehensive metadata
+			const editionUrl = `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=details`;
+			const response = await fetch(editionUrl);
+
+			if (!response.ok) {
+				console.log("Error fetching edition details:", response.status);
+				return null;
+			}
+
+			const data = await response.json();
+			const editionData = data[`ISBN:${isbn}`];
+			console.log(
+				"Received edition details:",
+				editionData ? "Found" : "Not found"
+			);
+
+			// IMPROVED: Try to extract additional data from edition details
+			if (editionData && editionData.details) {
+				// Look for chapter count in the details if available
+				if (
+					editionData.details.table_of_contents &&
+					Array.isArray(editionData.details.table_of_contents)
+				) {
+					const chapters = editionData.details.table_of_contents.filter(
+						(item) =>
+							(item.title && item.title.toLowerCase().includes("chapter")) ||
+							(item.type && item.type === "chapter")
+					);
+
+					if (chapters.length > 0) {
+						console.log("Found chapters in edition details:", chapters.length);
+						editionData.number_of_chapters = chapters.length;
+					}
+				}
+
+				// ENHANCED: Improved language extraction with focus on original language
+				if (
+					editionData.details.languages &&
+					Array.isArray(editionData.details.languages)
+				) {
+					// More comprehensive language code mapping
+					const langMap = {
+						eng: "English",
+						spa: "Spanish",
+						fre: "French",
+						ger: "German",
+						ita: "Italian",
+						rus: "Russian",
+						chi: "Chinese",
+						jpn: "Japanese",
+						ara: "Arabic",
+						hin: "Hindi",
+						por: "Portuguese",
+						ben: "Bengali",
+						tur: "Turkish",
+						kor: "Korean",
+						swe: "Swedish",
+						nor: "Norwegian",
+						dan: "Danish",
+						fin: "Finnish",
+						dut: "Dutch",
+						pol: "Polish",
+						gre: "Greek",
+						lat: "Latin",
+						heb: "Hebrew",
+						hun: "Hungarian",
+						cze: "Czech",
+						san: "Sanskrit",
+						ukr: "Ukrainian",
+						vie: "Vietnamese",
+						tha: "Thai",
+						may: "Malay",
+					};
+
+					// First look for language marked as original
+					let originalLanguage = null;
+					for (const lang of editionData.details.languages) {
+						if (
+							lang.original === true ||
+							(lang.key && lang.key.includes("/original/")) ||
+							lang.role === "original"
+						) {
+							const langCode =
+								typeof lang.key === "string"
+									? lang.key.split("/").pop()
+									: lang.key;
+							originalLanguage = langMap[langCode] || lang.name || langCode;
+							console.log(
+								"Found original language in edition data:",
+								originalLanguage
+							);
+							break;
+						}
+					}
+
+					// If no original language is marked, use the first language
+					if (!originalLanguage) {
+						const firstLang = editionData.details.languages[0];
+						const langCode =
+							typeof firstLang.key === "string"
+								? firstLang.key.split("/").pop()
+								: firstLang.key;
+						originalLanguage = langMap[langCode] || firstLang.name || langCode;
+						console.log(
+							"Using first language as probable original language:",
+							originalLanguage
+						);
+					}
+
+					editionData.original_language = originalLanguage;
+				}
+			}
+
+			return editionData;
+		} catch (error) {
+			console.log("Error in fetchEditionDetails:", error);
+			return null;
+		}
+	};
+
+	// Greatly enhanced selectBook function to populate all available metadata
+	const selectBook = async (book) => {
+		// Populate basic fields first
 		setTitle(book.title);
 		setAuthor(book.author);
 
 		if (book.publishedYear) {
 			setPublicationYear(book.publishedYear);
+		}
+
+		// ENHANCED: Fetch more detailed information from the OpenLibrary Work API
+		let detailedBookData = null;
+		if (book.key) {
+			detailedBookData = await fetchBookDetails(book.key);
+
+			// Set number of chapters if available from work data
+			if (detailedBookData && detailedBookData.number_of_chapters) {
+				setNumberOfChapters(detailedBookData.number_of_chapters.toString());
+				console.log(
+					"Setting number of chapters from work data:",
+					detailedBookData.number_of_chapters
+				);
+			}
+		}
+
+		// ENHANCED: Extract ISBN with improved validation
+		let foundIsbn = null;
+		if (book.isbn && book.isbn.length > 0) {
+			// Prefer ISBN-13 over ISBN-10
+			const isbn13 = book.isbn.find((i) => i && i.length === 13);
+			const isbn10 = book.isbn.find((i) => i && i.length === 10);
+			foundIsbn = isbn13 || isbn10 || book.isbn[0];
+
+			// Validate ISBN format (remove hyphens, spaces, etc.)
+			if (foundIsbn) {
+				foundIsbn = foundIsbn.replace(/[^0-9X]/gi, "");
+				setIsbn(foundIsbn);
+				console.log("Found and cleaned ISBN:", foundIsbn);
+			}
+		}
+
+		// ENHANCED: Fetch detailed edition information if ISBN is available
+		let editionData = null;
+		if (foundIsbn) {
+			editionData = await fetchEditionDetails(foundIsbn);
+		}
+
+		// ENHANCED: Extract and set publisher information with better validation
+		if (
+			editionData &&
+			editionData.publishers &&
+			editionData.publishers.length > 0
+		) {
+			const publisherName =
+				typeof editionData.publishers[0] === "object"
+					? editionData.publishers[0].name
+					: editionData.publishers[0];
+
+			setPublisher(publisherName || "");
+			console.log("Setting publisher:", publisherName);
+		} else if (book.publisher && book.publisher.length > 0) {
+			const publisherName =
+				typeof book.publisher[0] === "object"
+					? book.publisher[0].name
+					: book.publisher[0];
+
+			setPublisher(publisherName || "");
+			console.log("Setting publisher from search results:", publisherName);
+		}
+
+		// ENHANCED: Extract and set language with more robust handling
+		if (
+			editionData &&
+			editionData.languages &&
+			editionData.languages.length > 0
+		) {
+			let langName;
+
+			// Handle different formats of language data
+			if (typeof editionData.languages[0] === "object") {
+				langName = editionData.languages[0].name || "English";
+			} else {
+				langName = editionData.languages[0] || "English";
+			}
+
+			setLanguage(langName);
+			console.log("Setting language:", langName);
+		} else if (book.language && book.language.length > 0) {
+			// Fallback to search results language if available
+			let langName;
+
+			if (typeof book.language[0] === "object") {
+				langName = book.language[0].name || "English";
+			} else {
+				langName = book.language[0] || "English";
+			}
+
+			setLanguage(langName);
+			console.log("Setting language from search results:", langName);
+		}
+
+		// ENHANCED: Extract and set page count with better validation
+		if (editionData && editionData.number_of_pages) {
+			const pages = parseInt(editionData.number_of_pages);
+			if (!isNaN(pages) && pages > 0) {
+				setPageCount(pages.toString());
+				console.log("Setting page count:", pages);
+			}
+		} else if (editionData && editionData.pagination) {
+			// Try to extract from pagination string (e.g., "xii, 223 p.")
+			const pagesMatch = editionData.pagination.match(/(\d+)\s*p/);
+			if (pagesMatch && pagesMatch[1]) {
+				setPageCount(pagesMatch[1]);
+				console.log("Setting page count from pagination:", pagesMatch[1]);
+			}
+		} else if (book.number_of_pages) {
+			const pages = parseInt(book.number_of_pages);
+			if (!isNaN(pages) && pages > 0) {
+				setPageCount(pages.toString());
+				console.log("Setting page count from search results:", pages);
+			}
+		} else if (book.pagination) {
+			// Try search results pagination as last resort
+			const pagesMatch = book.pagination.match(/(\d+)\s*p/);
+			if (pagesMatch && pagesMatch[1]) {
+				setPageCount(pagesMatch[1]);
+				console.log(
+					"Setting page count from search pagination:",
+					pagesMatch[1]
+				);
+			}
+		}
+
+		// ENHANCED: Set number of chapters from edition data if not already set
+		if (!numberOfChapters && editionData && editionData.number_of_chapters) {
+			setNumberOfChapters(editionData.number_of_chapters.toString());
+			console.log(
+				"Setting number of chapters from edition:",
+				editionData.number_of_chapters
+			);
+		} else if (
+			!numberOfChapters &&
+			editionData &&
+			editionData.table_of_contents
+		) {
+			// Try to estimate from table of contents
+			const chapters = editionData.table_of_contents.filter(
+				(item) =>
+					(item.title && item.title.toLowerCase().includes("chapter")) ||
+					(item.type && item.type === "chapter")
+			);
+			if (chapters.length > 0) {
+				setNumberOfChapters(chapters.length.toString());
+				console.log("Estimated number of chapters from TOC:", chapters.length);
+			}
 		}
 
 		// IMPROVED: Create better book description with enhanced synopsis
@@ -1035,7 +1427,7 @@ export default function BookFormScreen({ route, navigation }) {
 		}
 	};
 
-	// UPDATED: Handle the form submission with improved error handling
+	// UPDATED: Handle the form submission with added number_of_chapters
 	const handleSubmit = async () => {
 		if (!title || !author) {
 			Alert.alert("Title and author are required fields.");
@@ -1050,6 +1442,25 @@ export default function BookFormScreen({ route, navigation }) {
 			// Add all the basic book information
 			formData.append("title", title);
 			formData.append("author", author);
+
+			// Add the metadata fields with improved validation
+			if (isbn && isbn.trim()) formData.append("isbn", isbn.trim());
+
+			if (publisher && publisher.trim())
+				formData.append("publisher", publisher.trim());
+
+			if (language && language.trim())
+				formData.append("language", language.trim());
+
+			if (pageCount && !isNaN(parseInt(pageCount))) {
+				formData.append("page_count", pageCount.toString());
+			}
+
+			// Add number of chapters to form data
+			if (numberOfChapters && !isNaN(parseInt(numberOfChapters))) {
+				formData.append("number_of_chapters", numberOfChapters.toString());
+				console.log("Adding number_of_chapters to form:", numberOfChapters);
+			}
 
 			// FIXED: Only send the first genre to match backend model expectations
 			if (genres && genres.length > 0) {

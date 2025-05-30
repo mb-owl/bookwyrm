@@ -102,6 +102,7 @@ class Book(models.Model):
     language = models.CharField(max_length=50, blank=True, null=True)
     publisher = models.CharField(max_length=255, blank=True, null=True)
     page_count = models.PositiveIntegerField(blank=True, null=True)
+    number_of_chapters = models.PositiveIntegerField(blank=True, null=True)  # New field for number of chapters
     publication_date = models.DateField(blank=True, null=True)  # New field for publication date
     
     # User-added metadata

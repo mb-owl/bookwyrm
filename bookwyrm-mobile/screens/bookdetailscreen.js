@@ -1046,6 +1046,7 @@ export default function BookDetailScreen({ route, navigation }) {
 					{renderField("ISBN", book.isbn)}
 					{renderField("Language", book.language)}
 					{renderField("Page Count", book.page_count)}
+					{renderField("Number of Chapters", book.number_of_chapters)}
 				</View>
 
 				{/* Tags Section */}
