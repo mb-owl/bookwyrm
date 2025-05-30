@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
 	View,
 	Text,
@@ -15,6 +15,7 @@ import { getApiEndpoint } from "../utils/apiConfig";
 import HamburgerMenu from "../components/HamburgerMenu";
 
 export default function TrashScreen({ navigation }) {
+	// State variables
 	const [deletedBooks, setDeletedBooks] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
@@ -22,7 +23,7 @@ export default function TrashScreen({ navigation }) {
 	const [showActionModal, setShowActionModal] = useState(false);
 	const [restoring, setRestoring] = useState(false);
 
-	// Use useFocusEffect to refresh the deleted books list whenever the screen comes into focus
+	// Refresh deleted books list and set navigation options when screen comes into focus
 	useFocusEffect(
 		React.useCallback(() => {
 			fetchDeletedBooks();
@@ -41,6 +42,7 @@ export default function TrashScreen({ navigation }) {
 		}, [navigation])
 	);
 
+	// Data fetching function
 	const fetchDeletedBooks = async () => {
 		try {
 			setLoading(true);
@@ -60,7 +62,6 @@ export default function TrashScreen({ navigation }) {
 
 			// Sort by deletion date, newest first
 			data.sort((a, b) => new Date(b.deleted_at) - new Date(a.deleted_at));
-
 			setDeletedBooks(data);
 		} catch (error) {
 			console.error("Error fetching deleted books:", error);
@@ -70,6 +71,7 @@ export default function TrashScreen({ navigation }) {
 		}
 	};
 
+	// Helper functions
 	const getDaysRemaining = (deletedAt) => {
 		if (!deletedAt) return "Unknown";
 
@@ -86,87 +88,69 @@ export default function TrashScreen({ navigation }) {
 
 	const formatDeletedDate = (deletedAt) => {
 		if (!deletedAt) return "Unknown date";
-
-		const date = new Date(deletedAt);
-		return date.toLocaleDateString();
+		return new Date(deletedAt).toLocaleDateString();
 	};
 
-	// Fixed restoreBook function with improved error handling and debugging
+	// Book restoration function
 	const restoreBook = async (book) => {
 		try {
 			setRestoring(true);
-
-			// Log the book we're trying to restore
 			console.log("Attempting to restore book:", book.id, book.title);
 
 			const endpoint = getApiEndpoint(`books/${book.id}/restore`);
-			console.log("Restoring book from trash - endpoint:", endpoint);
-
 			const response = await fetch(endpoint, {
 				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
+				headers: { "Content-Type": "application/json" },
 			});
 
 			console.log("Restore response status:", response.status);
 
 			if (!response.ok) {
-				// Extract detailed error information from response
+				// Extract error information
 				let errorText = "";
 				try {
 					const errorData = await response.json();
-					console.error("Server error response (JSON):", errorData);
 					errorText = errorData.detail || JSON.stringify(errorData);
 				} catch (e) {
 					try {
 						errorText = await response.text();
-						console.error("Server error response (text):", errorText);
 					} catch (e2) {
 						errorText = `HTTP error ${response.status}`;
-						console.error("Could not extract error details from response");
 					}
 				}
-
 				throw new Error(`Failed to restore book: ${errorText}`);
 			}
 
-			// Get restored book data from the response
+			// Process successful restoration
 			const restoredBook = await response.json();
 			console.log("Book restored successfully:", restoredBook);
 
-			// Remove the book from the deleted books list
+			// Update state and UI
 			setDeletedBooks(deletedBooks.filter((b) => b.id !== book.id));
-
-			// Close the action modal
 			setShowActionModal(false);
 
-			// Show success alert
+			// Show navigation options
 			Alert.alert(
 				"Success",
 				`"${book.title}" has been restored to your library.`,
 				[
 					{
 						text: "View Book",
-						onPress: () => {
-							// Navigate to book detail screen with the restored book
+						onPress: () =>
 							navigation.navigate("BookDetailScreen", {
 								book: restoredBook,
 								restored: true,
-							});
-						},
+							}),
 					},
 					{
 						text: "Go to Library",
-						onPress: () => {
-							// Navigate to book list with refresh flag
+						onPress: () =>
 							navigation.navigate("BookListScreen", {
 								refresh: Date.now(),
 								restored: true,
 								restoredBookId: book.id,
 								forceDelay: true,
-							});
-						},
+							}),
 						style: "default",
 					},
 				]
@@ -180,6 +164,7 @@ export default function TrashScreen({ navigation }) {
 		}
 	};
 
+	// Permanent deletion function
 	const permanentlyDeleteBook = async (book) => {
 		try {
 			setLoading(true);
@@ -187,18 +172,15 @@ export default function TrashScreen({ navigation }) {
 			const endpoint = getApiEndpoint(`books/${book.id}/permanent_delete`);
 			console.log("Permanently deleting book:", endpoint);
 
-			const response = await fetch(endpoint, {
-				method: "DELETE",
-			});
+			const response = await fetch(endpoint, { method: "DELETE" });
 
 			if (!response.ok) {
 				throw new Error(`Failed to permanently delete: ${response.status}`);
 			}
 
-			// Remove the book from the list
+			// Update state and UI
 			setDeletedBooks(deletedBooks.filter((b) => b.id !== book.id));
 			setShowActionModal(false);
-
 			Alert.alert("Success", `"${book.title}" has been permanently deleted.`);
 		} catch (error) {
 			console.error("Error permanently deleting book:", error);
@@ -208,6 +190,7 @@ export default function TrashScreen({ navigation }) {
 		}
 	};
 
+	// Empty trash function
 	const emptyTrash = () => {
 		Alert.alert(
 			"Empty Trash",
@@ -220,12 +203,8 @@ export default function TrashScreen({ navigation }) {
 					onPress: async () => {
 						try {
 							setLoading(true);
-
 							const endpoint = getApiEndpoint("books/empty_trash");
-
-							const response = await fetch(endpoint, {
-								method: "POST",
-							});
+							const response = await fetch(endpoint, { method: "POST" });
 
 							if (!response.ok) {
 								throw new Error(`Failed to empty trash: ${response.status}`);
@@ -245,6 +224,7 @@ export default function TrashScreen({ navigation }) {
 		);
 	};
 
+	// UI Rendering components
 	const renderBookItem = ({ item }) => (
 		<TouchableOpacity
 			style={styles.bookItem}
@@ -349,7 +329,7 @@ export default function TrashScreen({ navigation }) {
 		</Modal>
 	);
 
-	// Show loading state
+	// Conditional rendering for loading and error states
 	if (loading && deletedBooks.length === 0) {
 		return (
 			<View style={styles.centeredContainer}>
@@ -359,7 +339,6 @@ export default function TrashScreen({ navigation }) {
 		);
 	}
 
-	// Show error state
 	if (error) {
 		return (
 			<View style={styles.centeredContainer}>

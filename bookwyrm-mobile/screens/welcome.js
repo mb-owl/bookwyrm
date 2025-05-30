@@ -11,159 +11,88 @@ import {
 	SafeAreaView,
 	Platform,
 } from "react-native";
-import { useFocusEffect } from "@react-navigation/native"; // Fix: proper import for useFocusEffect
+import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiEndpoint } from "../utils/apiConfig";
 import HamburgerMenu from "../components/HamburgerMenu";
 
 export default function WelcomeScreen({ navigation }) {
-	// Add state for menu visibility
-	const [menuVisible, setMenuVisible] = useState(false);
-	// Add state for reading days counter
+	// Basic state variables
 	const [totalDaysRead, setTotalDaysRead] = useState(0);
 	const [hasReadToday, setHasReadToday] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
 
-	// Add state for Book of the Day with proper error boundaries
+	// Book of the Day state
 	const [bookOfTheDay, setBookOfTheDay] = useState(null);
 	const [bookOfTheDayLoading, setBookOfTheDayLoading] = useState(false);
 	const [bookOfTheDayError, setBookOfTheDayError] = useState(null);
-	const [bookWidgetVisible, setBookWidgetVisible] = useState(true); // Toggle to disable feature if it fails
+	const [bookWidgetVisible, setBookWidgetVisible] = useState(true);
 
-	// Toggle menu visibility
-	const toggleMenu = () => {
-		setMenuVisible(!menuVisible);
-	};
-
-	// Navigation handler with error handling for screens that don't exist yet
-	const navigateToScreen = (screenName) => {
-		try {
-			// List of screens that actually exist in the app
-			const existingScreens = [
-				"BookListScreen",
-				"BookFormScreen",
-				"BookDetailScreen",
-			];
-
-			if (existingScreens.includes(screenName)) {
-				setMenuVisible(false);
-				navigation.navigate(screenName);
-			} else {
-				setMenuVisible(false);
-				Alert.alert(
-					"Coming Soon",
-					`The ${screenName} feature is under development and will be available soon!`
-				);
-			}
-		} catch (error) {
-			console.error("Navigation error:", error);
-			Alert.alert("Navigation Error", "Could not navigate to this screen.");
-		}
-	};
-
-	// Menu items configuration - using direct string names instead of Screens object
-	const menuItems = [
-		{ title: "Book Library", screen: "BookListScreen", icon: "📚" },
-		{ title: "Add New Book", screen: "BookFormScreen", icon: "➕" },
-		{ title: "Favorites", screen: "Favorites", icon: "⭐" },
-		{ title: "Bookshelf", screen: "Bookshelf", icon: "📖" },
-		{ title: "Quotes & Notes", screen: "QuotesAndNotes", icon: "✏️" },
-		{ title: "My Photo Uploads", screen: "MyPhotoUploads", icon: "📷" },
-	];
-
-	// Regular useEffect for header setup
+	// Navigation setup
 	useEffect(() => {
-		// Setup header options if needed
 		navigation.setOptions({
 			headerLeft: () => <HamburgerMenu />,
 			headerShown: false,
 		});
 	}, [navigation]);
 
-	// Initial data loading effect
+	// Initialize Book of the Day
 	useEffect(() => {
-		// Load data on initial mount
-		fetchTotalDaysRead();
-		checkReadToday();
-
-		// Attempt to load book of the day
-		try {
-			if (bookWidgetVisible) {
-				fetchBookOfTheDay().catch((error) => {
-					console.error("Failed to fetch book of the day:", error);
-					setBookOfTheDayError("Could not load today's book suggestion");
-					setBookOfTheDayLoading(false);
-				});
-			}
-		} catch (error) {
-			console.error("Critical error in book of the day initialization:", error);
-			setBookWidgetVisible(false);
+		if (bookWidgetVisible) {
+			fetchBookOfTheDay().catch((error) => {
+				console.error("Failed to fetch book of the day:", error);
+				setBookOfTheDayError("Could not load today's book suggestion");
+				setBookOfTheDayLoading(false);
+			});
 		}
-	}, []); // Empty dependency array means this runs once on mount
+	}, [bookWidgetVisible]);
 
-	// Fixed: useFocusEffect implementation for screen refresh when navigating back
+	// Refresh reading stats when screen comes into focus
 	useFocusEffect(
 		React.useCallback(() => {
-			console.log("Welcome screen focused - refreshing data");
-
-			// Refresh data when screen comes back into focus
 			fetchTotalDaysRead();
 			checkReadToday();
-
-			// No need to return a cleanup function
-		}, []) // Empty dependency array means this effect runs on every focus
+		}, [])
 	);
 
-	// Check if the user has already marked today as read
+	// FETCH DATA FUNCTIONS
+
+	// Check if user has recorded reading today
 	const checkReadToday = async () => {
 		try {
-			const today = new Date().toISOString().split("T")[0]; // Format: YYYY-MM-DD
+			const today = new Date().toISOString().split("T")[0];
 			const lastReadDate = await AsyncStorage.getItem("lastReadDate");
-
-			if (lastReadDate === today) {
-				setHasReadToday(true);
-			} else {
-				setHasReadToday(false);
-			}
+			setHasReadToday(lastReadDate === today);
 		} catch (error) {
 			console.error("Error checking read status:", error);
 		}
 	};
 
-	// Fetch the total days read count from backend
+	// Fetch total days read count
 	const fetchTotalDaysRead = async () => {
 		try {
 			setIsLoading(true);
 			const endpoint = getApiEndpoint("reading-stats/");
-
 			const response = await fetch(endpoint);
 
 			if (response.ok) {
 				const data = await response.json();
 				setTotalDaysRead(data.total_days_read || 0);
 			} else {
-				console.error("Failed to fetch reading stats:", response.status);
-
-				// Fallback to locally stored count if backend fails
+				// Fallback to local storage
 				const localCount = await AsyncStorage.getItem("totalDaysRead");
-				if (localCount) {
-					setTotalDaysRead(parseInt(localCount, 10));
-				}
+				if (localCount) setTotalDaysRead(parseInt(localCount, 10));
 			}
 		} catch (error) {
 			console.error("Error fetching reading stats:", error);
-
-			// Fallback to locally stored count
 			const localCount = await AsyncStorage.getItem("totalDaysRead");
-			if (localCount) {
-				setTotalDaysRead(parseInt(localCount, 10));
-			}
+			if (localCount) setTotalDaysRead(parseInt(localCount, 10));
 		} finally {
 			setIsLoading(false);
 		}
 	};
 
-	// Handle the "I Read Today!" button press
+	// Record today's reading
 	const handleReadToday = async () => {
 		if (hasReadToday) {
 			Alert.alert(
@@ -178,46 +107,26 @@ export default function WelcomeScreen({ navigation }) {
 			const today = new Date().toISOString().split("T")[0];
 			const endpoint = getApiEndpoint("reading-stats/");
 
-			const response = await fetch(endpoint, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					read_date: today,
-				}),
-			});
-
-			if (response.ok) {
-				// Update the local state
-				setTotalDaysRead((prevCount) => prevCount + 1);
-				setHasReadToday(true);
-
-				// Save to AsyncStorage as backup
-				await AsyncStorage.setItem(
-					"totalDaysRead",
-					(totalDaysRead + 1).toString()
-				);
-				await AsyncStorage.setItem("lastReadDate", today);
-
-				Alert.alert("Success!", "Your reading day has been recorded!");
-			} else {
-				// Fallback to local storage if backend fails
-				setTotalDaysRead((prevCount) => prevCount + 1);
-				setHasReadToday(true);
-
-				await AsyncStorage.setItem(
-					"totalDaysRead",
-					(totalDaysRead + 1).toString()
-				);
-				await AsyncStorage.setItem("lastReadDate", today);
-
+			// Try to save to backend
+			try {
+				const response = await fetch(endpoint, {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ read_date: today }),
+				});
+				if (!response.ok) throw new Error("Backend request failed");
+			} catch (apiError) {
 				console.error("Backend save failed, using local storage instead");
-				Alert.alert(
-					"Saved Locally",
-					"Your reading day has been recorded locally."
-				);
 			}
+
+			// Update local state and storage regardless
+			const newCount = totalDaysRead + 1;
+			setTotalDaysRead(newCount);
+			setHasReadToday(true);
+			await AsyncStorage.setItem("totalDaysRead", newCount.toString());
+			await AsyncStorage.setItem("lastReadDate", today);
+
+			Alert.alert("Success!", "Your reading day has been recorded!");
 		} catch (error) {
 			console.error("Error recording reading day:", error);
 			Alert.alert(
@@ -229,7 +138,9 @@ export default function WelcomeScreen({ navigation }) {
 		}
 	};
 
-	// Function to fetch book of the day suggestion - with error boundaries
+	// BOOK OF THE DAY FUNCTIONS
+
+	// Main function to fetch book suggestion
 	const fetchBookOfTheDay = async () => {
 		if (!bookWidgetVisible) return;
 
@@ -237,38 +148,40 @@ export default function WelcomeScreen({ navigation }) {
 			setBookOfTheDayLoading(true);
 			setBookOfTheDayError(null);
 
-			// First try to get user's books to analyze patterns
+			// Get user's books for recommendation
 			let userBooks = [];
 			try {
 				const cachedBooks = await AsyncStorage.getItem("books");
 				userBooks = cachedBooks ? JSON.parse(cachedBooks) : [];
-			} catch (cacheError) {
-				console.log("Could not read cached books:", cacheError);
-				// Continue with empty user books array
+			} catch (error) {
+				console.log("Could not read cached books:", error);
 			}
 
-			// Extract genres and authors from user's books
-			const userGenres = userBooks.map((book) => book.genre).filter(Boolean);
-			const userAuthors = userBooks.map((book) => book.author).filter(Boolean);
-
-			// If user has no books, use a default recommendation approach
+			// Try personalized or random recommendation
 			if (userBooks.length === 0) {
 				await fetchRandomBookSuggestion();
-				return;
-			}
-
-			// Try to fetch a personalized recommendation
-			try {
-				await fetchPersonalizedBookSuggestion(userGenres, userAuthors);
-			} catch (error) {
-				console.log("Personalized suggestion failed, using random:", error);
-				await fetchRandomBookSuggestion();
+			} else {
+				try {
+					const userGenres = userBooks
+						.map((book) => book.genre)
+						.filter(Boolean);
+					const userAuthors = userBooks
+						.map((book) => book.author)
+						.filter(Boolean);
+					await fetchPersonalizedBookSuggestion(
+						userGenres,
+						userAuthors,
+						userBooks
+					);
+				} catch (error) {
+					console.log("Personalized suggestion failed, using random:", error);
+					await fetchRandomBookSuggestion();
+				}
 			}
 		} catch (error) {
-			console.error("Error in main fetchBookOfTheDay function:", error);
+			console.error("Error fetching book of the day:", error);
 			setBookOfTheDayError("Could not load today's book suggestion");
-
-			// Use a fallback option that won't make API calls
+			// Fallback book
 			setBookOfTheDay({
 				title: "Pride and Prejudice",
 				author: "Jane Austen",
@@ -282,9 +195,13 @@ export default function WelcomeScreen({ navigation }) {
 		}
 	};
 
-	// Fetch a personalized book suggestion based on user's reading history
-	const fetchPersonalizedBookSuggestion = async (genres, authors) => {
-		// Take the most common genre and a random author the user has read
+	// Fetch a personalized book suggestion
+	const fetchPersonalizedBookSuggestion = async (
+		genres,
+		authors,
+		userBooks
+	) => {
+		// Find most common genre
 		const genreCounts = genres.reduce((acc, genre) => {
 			acc[genre] = (acc[genre] || 0) + 1;
 			return acc;
@@ -295,16 +212,18 @@ export default function WelcomeScreen({ navigation }) {
 				.sort((a, b) => b[1] - a[1])
 				.map((entry) => entry[0])[0] || "fiction";
 
+		// Pick a random author
 		const randomAuthor =
 			authors.length > 0
 				? authors[Math.floor(Math.random() * authors.length)]
 				: "";
 
-		// Use Open Library API to find a book suggestion
+		// Build search query
 		const searchTerm = randomAuthor
 			? `${topGenre} ${randomAuthor.split(" ").pop()}`
 			: topGenre;
 
+		// Search Open Library
 		const response = await fetch(
 			`https://openlibrary.org/search.json?q=${encodeURIComponent(
 				searchTerm
@@ -312,13 +231,13 @@ export default function WelcomeScreen({ navigation }) {
 		);
 
 		if (!response.ok) {
-			throw new Error(`Open Library API returned ${response.status}`);
+			throw new Error(`Open Library API error: ${response.status}`);
 		}
 
 		const data = await response.json();
 
 		if (data.docs && data.docs.length > 0) {
-			// Filter out books the user already has
+			// Avoid suggesting books the user already has
 			const existingBookTitles = new Set(
 				userBooks.map((book) => book.title.toLowerCase())
 			);
@@ -327,9 +246,9 @@ export default function WelcomeScreen({ navigation }) {
 			);
 
 			if (newSuggestions.length > 0) {
-				// Pick a random book from filtered suggestions
-				const randomIndex = Math.floor(Math.random() * newSuggestions.length);
-				const suggestion = newSuggestions[randomIndex];
+				// Select a random book from suggestions
+				const suggestion =
+					newSuggestions[Math.floor(Math.random() * newSuggestions.length)];
 
 				setBookOfTheDay({
 					title: suggestion.title,
@@ -342,13 +261,11 @@ export default function WelcomeScreen({ navigation }) {
 					publishYear: suggestion.first_publish_year,
 					olKey: suggestion.key,
 					description: "A recommended book based on your reading preferences.",
-					// Include metadata that would help with quick add
 					genre: topGenre,
 					source: "open_library",
 					sourceId: suggestion.key,
 				});
 			} else {
-				// Fallback if all suggestions are already in the user's library
 				await fetchRandomBookSuggestion();
 			}
 		} else {
@@ -356,10 +273,10 @@ export default function WelcomeScreen({ navigation }) {
 		}
 	};
 
-	// Fallback function to fetch a random book suggestion - simplified for reliability
+	// Fallback function for random book suggestion
 	const fetchRandomBookSuggestion = async () => {
 		try {
-			// List of classic books that are generally well-regarded
+			// Curated list of classic books
 			const classicBooks = [
 				{
 					title: "Pride and Prejudice",
@@ -384,11 +301,10 @@ export default function WelcomeScreen({ navigation }) {
 				},
 			];
 
-			// Select a random book
+			// Pick a random book
 			const randomBook =
 				classicBooks[Math.floor(Math.random() * classicBooks.length)];
 
-			// Set a basic book suggestion without making additional API calls
 			setBookOfTheDay({
 				...randomBook,
 				description: "A classic book that every reader should explore.",
@@ -396,8 +312,8 @@ export default function WelcomeScreen({ navigation }) {
 				coverUrl: null,
 			});
 		} catch (error) {
-			console.error("Error in fetchRandomBookSuggestion:", error);
-			// Set a very simple fallback
+			console.error("Error in random book suggestion:", error);
+			// Simple fallback
 			setBookOfTheDay({
 				title: "Pride and Prejudice",
 				author: "Jane Austen",
@@ -408,31 +324,27 @@ export default function WelcomeScreen({ navigation }) {
 		}
 	};
 
-	// Function to quickly add the suggested book to the user's library
+	// Add suggested book to library
 	const quickAddSuggestedBook = async () => {
 		if (!bookOfTheDay) return;
 
 		try {
-			// Show loading state
 			setBookOfTheDayLoading(true);
 
-			// Create form data for the new book
+			// Create form data
 			const formData = new FormData();
 			formData.append("title", bookOfTheDay.title);
 			formData.append("author", bookOfTheDay.author);
 			formData.append("genre", bookOfTheDay.genre || "unknown");
 
-			// Add book notes if we have a description
 			if (bookOfTheDay.description) {
 				formData.append("book_notes", bookOfTheDay.description);
 			}
 
-			// Add cover URL if available
 			if (bookOfTheDay.coverUrl) {
 				formData.append("external_cover_url", bookOfTheDay.coverUrl);
 			}
 
-			// Set toBeRead status
 			formData.append("toBeRead", "true");
 
 			// Submit to API
@@ -440,19 +352,14 @@ export default function WelcomeScreen({ navigation }) {
 			const response = await fetch(endpoint, {
 				method: "POST",
 				body: formData,
-				headers: {
-					Accept: "application/json",
-				},
+				headers: { Accept: "application/json" },
 			});
 
 			if (!response.ok) {
 				throw new Error(`Failed to add book: ${response.status}`);
 			}
 
-			const data = await response.json();
-			console.log("Book added successfully:", data);
-
-			// Show success message
+			// Show success message with navigation options
 			Alert.alert(
 				"Book Added",
 				`"${bookOfTheDay.title}" has been added to your To Be Read list!`,
@@ -465,10 +372,7 @@ export default function WelcomeScreen({ navigation }) {
 					{
 						text: "Stay Here",
 						style: "cancel",
-						onPress: () => {
-							// Fetch a new book suggestion
-							fetchBookOfTheDay();
-						},
+						onPress: () => fetchBookOfTheDay(),
 					},
 				]
 			);
@@ -483,11 +387,12 @@ export default function WelcomeScreen({ navigation }) {
 		}
 	};
 
-	// Render the Book of the Day widget - with error boundaries
+	// Render the Book of the Day widget
 	const renderBookOfTheDay = () => {
 		if (!bookWidgetVisible) return null;
 
 		try {
+			// Loading state
 			if (bookOfTheDayLoading && !bookOfTheDay) {
 				return (
 					<View style={styles.bookOfTheDayCard}>
@@ -502,6 +407,7 @@ export default function WelcomeScreen({ navigation }) {
 				);
 			}
 
+			// Error state
 			if (bookOfTheDayError && !bookOfTheDay) {
 				return (
 					<View style={styles.bookOfTheDayCard}>
@@ -517,12 +423,15 @@ export default function WelcomeScreen({ navigation }) {
 				);
 			}
 
+			// No book to display
 			if (!bookOfTheDay) return null;
 
+			// Book suggestion
 			return (
 				<View style={styles.bookOfTheDayCard}>
 					<Text style={styles.bookOfTheDayTitle}>Book of the Day</Text>
 					<View style={styles.bookOfTheDayContent}>
+						{/* Book Cover */}
 						{bookOfTheDay.coverUrl ? (
 							<Image
 								source={{ uri: bookOfTheDay.coverUrl }}
@@ -537,6 +446,7 @@ export default function WelcomeScreen({ navigation }) {
 							</View>
 						)}
 
+						{/* Book Details */}
 						<View style={styles.bookDetails}>
 							<Text style={styles.bookTitle}>{bookOfTheDay.title}</Text>
 							<Text style={styles.bookAuthor}>by {bookOfTheDay.author}</Text>
@@ -556,6 +466,7 @@ export default function WelcomeScreen({ navigation }) {
 						</View>
 					</View>
 
+					{/* Action Buttons */}
 					<TouchableOpacity
 						style={styles.quickAddButton}
 						onPress={quickAddSuggestedBook}
@@ -581,16 +492,16 @@ export default function WelcomeScreen({ navigation }) {
 			);
 		} catch (error) {
 			console.error("Error rendering Book of the Day widget:", error);
-			return null; // Return null if rendering fails to prevent the whole screen from crashing
+			return null;
 		}
 	};
 
-	// Main render function - wrapped in error boundary
+	// Main render function with error boundary
 	try {
 		return (
 			<SafeAreaView style={styles.container}>
 				<ScrollView style={styles.scrollView}>
-					{/* Main welcome content */}
+					{/* Welcome Header */}
 					<View style={styles.header}>
 						<Text style={styles.welcomeTitle}>Welcome to BookWyrm</Text>
 						<Text style={styles.welcomeSubtitle}>
@@ -598,40 +509,7 @@ export default function WelcomeScreen({ navigation }) {
 						</Text>
 					</View>
 
-					{/* Reading statistics card - Add this section */}
-					<View style={styles.statsCard}>
-						<Text style={styles.statsTitle}>Reading Stats</Text>
-						{isLoading ? (
-							<ActivityIndicator size="small" color="#3498db" />
-						) : (
-							<View style={styles.statsContent}>
-								<View style={styles.statItem}>
-									<Text style={styles.statValue}>{totalDaysRead}</Text>
-									<Text style={styles.statLabel}>Days Read</Text>
-								</View>
-
-								<TouchableOpacity
-									style={[
-										styles.readTodayButton,
-										hasReadToday && styles.readTodayButtonDisabled,
-									]}
-									onPress={() =>
-										Alert.alert(
-											"Coming Soon",
-											"This feature will be available soon!"
-										)
-									}
-									disabled={hasReadToday}
-								>
-									<Text style={styles.readTodayButtonText}>
-										{hasReadToday ? "Read Today ✓" : "I Read Today!"}
-									</Text>
-								</TouchableOpacity>
-							</View>
-						)}
-					</View>
-
-					{/* Main action buttons */}
+					{/* Main Navigation Buttons */}
 					<View style={styles.buttonsContainer}>
 						<TouchableOpacity
 							style={styles.mainButton}
@@ -662,10 +540,10 @@ export default function WelcomeScreen({ navigation }) {
 						</TouchableOpacity>
 					</View>
 
-					{/* Add the Book of the Day widget in a way that won't crash the app */}
+					{/* Book of the Day Widget */}
 					{renderBookOfTheDay()}
 
-					{/* Debug information (dev only) */}
+					{/* Debug Information (Development Only) */}
 					{__DEV__ && (
 						<View style={styles.debugInfo}>
 							<Text style={styles.debugText}>Running on: {Platform.OS}</Text>
@@ -677,7 +555,7 @@ export default function WelcomeScreen({ navigation }) {
 		);
 	} catch (error) {
 		console.error("Critical error in welcome screen render:", error);
-		// Fallback render for complete failure - ensures something always renders
+		// Fallback for catastrophic failures
 		return (
 			<SafeAreaView
 				style={[
@@ -697,6 +575,7 @@ export default function WelcomeScreen({ navigation }) {
 	}
 }
 
+// Keep existing styles
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
@@ -963,42 +842,5 @@ const styles = StyleSheet.create({
 	debugText: {
 		fontSize: 12,
 		color: "#666",
-	},
-	// New styles for reading stats card
-	statsCard: {
-		backgroundColor: "#fff",
-		borderRadius: 10,
-		padding: 15,
-		marginBottom: 20,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
-		elevation: 3,
-		borderWidth: 1,
-		borderColor: "#e0e0e0",
-	},
-	statsTitle: {
-		fontSize: 18,
-		fontWeight: "bold",
-		marginBottom: 10,
-		textAlign: "center",
-		color: "#3498db",
-	},
-	statsContent: {
-		alignItems: "center",
-	},
-	statItem: {
-		alignItems: "center",
-		marginBottom: 10,
-	},
-	statValue: {
-		fontSize: 32,
-		fontWeight: "bold",
-		color: "#2c3e50",
-	},
-	statLabel: {
-		fontSize: 14,
-		color: "#7f8c8d",
 	},
 });
