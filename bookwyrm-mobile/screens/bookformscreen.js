@@ -38,6 +38,19 @@ export default function BookFormScreen({ route, navigation }) {
 	const [bookNotes, setBookNotes] = useState(
 		editingBook ? editingBook.book_notes : ""
 	);
+	// Add the missing favorite state variable here
+	const [favorite, setFavorite] = useState(
+		editingBook ? editingBook.favorite : false
+	);
+	const [currentlyReading, setCurrentlyReading] = useState(
+		editingBook ? editingBook.currently_reading : false
+	);
+	const [didNotFinish, setDidNotFinish] = useState(
+		editingBook ? editingBook.did_not_finish : false
+	);
+	const [recommendedToMe, setRecommendedToMe] = useState(
+		editingBook ? editingBook.recommended_to_me : false
+	);
 	const [rating, setRating] = useState(
 		editingBook ? editingBook.rating || 0 : 0
 	);
@@ -200,7 +213,7 @@ export default function BookFormScreen({ route, navigation }) {
 
 	// Modify the existing useEffect for navigation options
 	useEffect(() => {
-		// Add home button to the header
+		// Add home button to the header and favorite star button
 		navigation.setOptions({
 			headerLeft: () => (
 				<TouchableOpacity
@@ -210,8 +223,16 @@ export default function BookFormScreen({ route, navigation }) {
 					<Text style={styles.homeButtonText}>🏠</Text>
 				</TouchableOpacity>
 			),
+			headerRight: () => (
+				<TouchableOpacity
+					style={styles.favoriteButton}
+					onPress={() => setFavorite(!favorite)}
+				>
+					<Text style={styles.favoriteButtonText}>{favorite ? "⭐" : "☆"}</Text>
+				</TouchableOpacity>
+			),
 		});
-	}, [navigation]);
+	}, [navigation, favorite]);
 
 	// Sync genres when the component mounts
 	useEffect(() => {
@@ -1016,6 +1037,12 @@ export default function BookFormScreen({ route, navigation }) {
 			formData.append("toBeRead", toBeRead ? "true" : "false");
 			formData.append("shelved", shelved ? "true" : "false");
 
+			// Add new boolean values for status
+			formData.append("currently_reading", currentlyReading ? "true" : "false");
+			formData.append("did_not_finish", didNotFinish ? "true" : "false");
+			formData.append("recommended_to_me", recommendedToMe ? "true" : "false");
+			formData.append("favorite", favorite ? "true" : "false");
+
 			// Format date as YYYY-MM-DD for Django
 			const dateObj = new Date(publicationYear, 0, 1);
 			const formattedDate = dateObj.toISOString().split("T")[0];
@@ -1308,6 +1335,48 @@ export default function BookFormScreen({ route, navigation }) {
 					onValueChange={setShelved}
 					trackColor={{ false: "#767577", true: "#81b0ff" }}
 					thumbColor={shelved ? "#f5dd4b" : "#f4f3f4"}
+				/>
+			</View>
+
+			{/* New status toggles */}
+			<View style={styles.switchContainer}>
+				<Text style={styles.label}>Currently Reading:</Text>
+				<Switch
+					value={currentlyReading}
+					onValueChange={setCurrentlyReading}
+					trackColor={{ false: "#767577", true: "#81b0ff" }}
+					thumbColor={currentlyReading ? "#f5dd4b" : "#f4f3f4"}
+				/>
+			</View>
+
+			<View style={styles.switchContainer}>
+				<Text style={styles.label}>Did Not Finish:</Text>
+				<Switch
+					value={didNotFinish}
+					onValueChange={setDidNotFinish}
+					trackColor={{ false: "#767577", true: "#81b0ff" }}
+					thumbColor={didNotFinish ? "#f5dd4b" : "#f4f3f4"}
+				/>
+			</View>
+
+			<View style={styles.switchContainer}>
+				<Text style={styles.label}>Recommended To Me:</Text>
+				<Switch
+					value={recommendedToMe}
+					onValueChange={setRecommendedToMe}
+					trackColor={{ false: "#767577", true: "#81b0ff" }}
+					thumbColor={recommendedToMe ? "#f5dd4b" : "#f4f3f4"}
+				/>
+			</View>
+
+			{/* Favorite toggle */}
+			<View style={styles.switchContainer}>
+				<Text style={styles.label}>Favorite:</Text>
+				<Switch
+					value={favorite}
+					onValueChange={setFavorite}
+					trackColor={{ false: "#767577", true: "#ffb900" }}
+					thumbColor={favorite ? "#f5dd4b" : "#f4f3f4"}
 				/>
 			</View>
 
@@ -1956,5 +2025,13 @@ const styles = StyleSheet.create({
 	},
 	homeButtonText: {
 		fontSize: 20,
+	},
+	// Add styles for the favorite button
+	favoriteButton: {
+		padding: 10,
+		marginRight: 5,
+	},
+	favoriteButtonText: {
+		fontSize: 24,
 	},
 });

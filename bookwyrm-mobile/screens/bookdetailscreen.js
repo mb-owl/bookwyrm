@@ -40,7 +40,7 @@ export default function BookDetailScreen({ route, navigation }) {
 
 	// Add this to ensure our custom header is respected
 	useEffect(() => {
-		// Add home button to the header
+		// Add home button to the header and favorite star
 		navigation.setOptions({
 			headerLeft: () => (
 				<TouchableOpacity
@@ -50,8 +50,47 @@ export default function BookDetailScreen({ route, navigation }) {
 					<Text style={styles.homeButtonText}>🏠</Text>
 				</TouchableOpacity>
 			),
+			headerRight: () =>
+				book && (
+					<TouchableOpacity
+						style={styles.favoriteButton}
+						onPress={toggleFavorite}
+					>
+						<Text style={styles.favoriteButtonText}>
+							{book.favorite ? "⭐" : "☆"}
+						</Text>
+					</TouchableOpacity>
+				),
 		});
-	}, [navigation]);
+	}, [navigation, book]);
+
+	// Add function to toggle favorite status
+	const toggleFavorite = async () => {
+		if (!book) return;
+
+		try {
+			const updatedBook = { ...book, favorite: !book.favorite };
+
+			// Create form data for the update
+			const formData = new FormData();
+			formData.append("favorite", updatedBook.favorite ? "true" : "false");
+
+			// Update only the favorite field
+			const response = await fetch(`${API_BASE_URL}/books/${book.id}/`, {
+				method: "PATCH",
+				body: formData,
+			});
+
+			if (response.ok) {
+				// Update local state
+				setBook(updatedBook);
+			} else {
+				console.error("Failed to update favorite status");
+			}
+		} catch (error) {
+			console.error("Error toggling favorite:", error);
+		}
+	};
 
 	// Fetch book details from the API
 	const fetchBookDetails = async () => {
@@ -323,6 +362,65 @@ export default function BookDetailScreen({ route, navigation }) {
 							]}
 						>
 							{book.shelved ? "On Shelf" : "Not on Shelf"}
+						</Text>
+					</View>
+
+					{/* New status badges */}
+					<View
+						style={[
+							styles.statusBadge,
+							book.currently_reading && styles.activeStatusBadge,
+						]}
+					>
+						<Text
+							style={[
+								styles.statusText,
+								book.currently_reading && styles.activeStatusText,
+							]}
+						>
+							{book.currently_reading ? "Currently Reading" : "Not Reading"}
+						</Text>
+					</View>
+
+					<View
+						style={[
+							styles.statusBadge,
+							book.did_not_finish && styles.activeStatusBadge,
+						]}
+					>
+						<Text
+							style={[
+								styles.statusText,
+								book.did_not_finish && styles.activeStatusText,
+							]}
+						>
+							{book.did_not_finish ? "Did Not Finish" : "Completed"}
+						</Text>
+					</View>
+
+					<View
+						style={[
+							styles.statusBadge,
+							book.recommended_to_me && styles.activeStatusBadge,
+						]}
+					>
+						<Text
+							style={[
+								styles.statusText,
+								book.recommended_to_me && styles.activeStatusText,
+							]}
+						>
+							{book.recommended_to_me ? "Recommended" : "Not Recommended"}
+						</Text>
+					</View>
+
+					<View
+						style={[styles.statusBadge, book.favorite && styles.favoriteBadge]}
+					>
+						<Text
+							style={[styles.statusText, book.favorite && styles.favoriteText]}
+						>
+							{book.favorite ? "⭐ Favorite" : "Not Favorite"}
 						</Text>
 					</View>
 				</View>
@@ -693,5 +791,20 @@ const styles = StyleSheet.create({
 	},
 	homeButtonText: {
 		fontSize: 20,
+	},
+	favoriteButton: {
+		padding: 10,
+		marginRight: 5,
+	},
+	favoriteButtonText: {
+		fontSize: 24,
+	},
+	favoriteBadge: {
+		backgroundColor: "#fff3cd",
+		borderColor: "#ffd700",
+	},
+	favoriteText: {
+		color: "#856404",
+		fontWeight: "600",
 	},
 });

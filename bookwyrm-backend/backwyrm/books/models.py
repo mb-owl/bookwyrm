@@ -76,11 +76,17 @@ class Book(models.Model):
         null=True
     )
     book_notes = models.TextField(blank=True, null=True)
+    
+    # Reading status fields
     toBeRead = models.BooleanField(default=False)
     is_read = models.BooleanField(default=False)
     shelved = models.BooleanField(default=False)
-    publication_date = models.DateField(blank=True, null=True)
-    cover = models.ImageField(upload_to='covers/', blank=True, null=True)
+    
+    # New reading status fields
+    currently_reading = models.BooleanField(default=False)
+    did_not_finish = models.BooleanField(default=False)
+    recommended_to_me = models.BooleanField(default=False)
+    favorite = models.BooleanField(default=False)
     
     # Additional metadata
     created_at = models.DateTimeField(auto_now_add=True)

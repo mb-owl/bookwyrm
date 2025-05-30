@@ -11,6 +11,7 @@ import WelcomeScreen from "./screens/welcome";
 import booklistscreen from "./screens/booklistscreen";
 import bookdetailscreen from "./screens/bookdetailscreen";
 import bookformscreen from "./screens/bookformscreen";
+import FavoritesScreen from "./screens/favorites"; // Add this import
 
 const Stack = createNativeStackNavigator();
 
@@ -85,6 +86,12 @@ export default function App() {
 					name="BookFormScreen"
 					component={bookformscreen}
 					options={{ title: "Add/Edit Book" }}
+				/>
+				{/* Add the Favorites screen */}
+				<Stack.Screen
+					name="Favorites"
+					component={FavoritesScreen}
+					options={{ title: "Favorite Books" }}
 				/>
 			</Stack.Navigator>
 		</NavigationContainer>
