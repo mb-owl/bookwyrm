@@ -12,7 +12,12 @@ import {
 	ScrollView,
 	Alert,
 } from "react-native";
-import { API_BASE_URL, getMediaUrl } from "../utils/apiConfig";
+// Import API configuration
+import {
+	API_BASE_URL,
+	getMediaUrl,
+	getBookPhotosUrl,
+} from "../utils/apiConfig";
 import HamburgerMenu from "../components/HamburgerMenu";
 
 const MyPhotoUploadsScreen = ({ navigation }) => {
@@ -170,7 +175,7 @@ const MyPhotoUploadsScreen = ({ navigation }) => {
 				source={{
 					uri: item.photo_url.startsWith("http")
 						? item.photo_url
-						: `${getMediaUrl()}book_photos/${item.photo_url.split("/").pop()}`,
+						: `${getBookPhotosUrl()}${item.photo_url.split("/").pop()}`,
 				}}
 				style={styles.thumbnail}
 				resizeMode="cover"
@@ -204,7 +209,7 @@ const MyPhotoUploadsScreen = ({ navigation }) => {
 								source={{
 									uri: selectedPhoto.photo_url.startsWith("http")
 										? selectedPhoto.photo_url
-										: `${getMediaUrl()}book_photos/${selectedPhoto.photo_url
+										: `${getBookPhotosUrl()}${selectedPhoto.photo_url
 												.split("/")
 												.pop()}`,
 								}}

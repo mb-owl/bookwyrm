@@ -15,7 +15,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Import API configuration
-import { API_BASE_URL, getMediaUrl } from "../utils/apiConfig";
+import { API_BASE_URL, getMediaUrl, getApiEndpoint } from "../utils/apiConfig";
 import HamburgerMenu from "../components/HamburgerMenu";
 
 export default function BookListScreen({ route, navigation }) {
@@ -34,9 +34,18 @@ export default function BookListScreen({ route, navigation }) {
 
 	// Add this to ensure our custom header is respected
 	useEffect(() => {
-		// Replace home button with hamburger menu
+		// Update to include both hamburger menu on left and home button on right
 		navigation.setOptions({
 			headerLeft: () => <HamburgerMenu />,
+			headerRight: () => (
+				<TouchableOpacity
+					style={styles.homeButton}
+					onPress={() => navigation.navigate("WelcomeScreen")}
+					accessibilityLabel="Go to home screen"
+				>
+					<Text style={styles.homeButtonText}>🏠</Text>
+				</TouchableOpacity>
+			),
 		});
 	}, [navigation]);
 
@@ -45,8 +54,8 @@ export default function BookListScreen({ route, navigation }) {
 			setLoading(true);
 			console.log("Fetching books...");
 
-			// Add trailing slash for Django REST consistency
-			const url = `${API_BASE_URL}/books/`;
+			// Use the helper function to get proper URL formatting
+			const url = getApiEndpoint("books");
 			console.log("Fetching books from:", url);
 
 			const response = await fetch(url, {
@@ -99,14 +108,12 @@ export default function BookListScreen({ route, navigation }) {
 				console.error("Error loading from cache:", cacheError);
 			}
 
+			// Improved error message with more details
 			Alert.alert(
 				"Connection Error",
-				"Could not connect to the server at " +
-					API_BASE_URL +
-					".\n\n" +
-					"Please check your connection and server status.\n\n" +
-					"Error: " +
-					error.message
+				"Could not connect to the server.\n\n" +
+					"The app will continue using cached data if available.\n\n" +
+					(error.message || "Unknown error")
 			);
 		} finally {
 			setLoading(false);
@@ -578,7 +585,7 @@ export default function BookListScreen({ route, navigation }) {
 
 			// Make separate requests for each book
 			const updatePromises = selectedBooks.map((book) => {
-				const updateUrl = `${API_BASE_URL}/books/${book.id}/`;
+				const updateUrl = getApiEndpoint(`books/${book.id}`);
 
 				const formData = new FormData();
 				formData.append("title", book.title);
@@ -635,7 +642,7 @@ export default function BookListScreen({ route, navigation }) {
 
 							// Make separate requests for each book deletion
 							const deletePromises = selectedBooks.map((book) => {
-								const deleteUrl = `${API_BASE_URL}/books/${book.id}/`;
+								const deleteUrl = getApiEndpoint(`books/${book.id}`);
 								return fetch(deleteUrl, { method: "DELETE" });
 							});
 
@@ -1182,6 +1189,6 @@ const styles = StyleSheet.create({
 		padding: 10,
 	},
 	homeButtonText: {
-		fontSize: 20,
+		fontSize: 24, // Increased size for better visibility
 	},
 });

@@ -15,11 +15,14 @@ import FavoritesScreen from "./screens/favorites"; // Add this import
 
 const Stack = createNativeStackNavigator();
 
-// Check server connectivity
+// Check server connectivity - FIXED to use books endpoint instead of root
 const checkServerConnection = async () => {
 	try {
-		console.log("Checking server connection to:", API_BASE_URL);
-		const response = await fetch(`${API_BASE_URL}/`, {
+		// Use the books endpoint which definitely exists, instead of the root endpoint
+		const endpoint = `${API_BASE_URL}/books/`;
+		console.log("Checking server connection to:", endpoint);
+
+		const response = await fetch(endpoint, {
 			method: "GET",
 			headers: {
 				Accept: "application/json",
@@ -36,11 +39,10 @@ const checkServerConnection = async () => {
 		}
 	} catch (error) {
 		console.error("Server connection error:", error);
-		Alert.alert(
-			"Server Connection Error",
-			`Could not connect to the server at ${API_BASE_URL}/\n\n` +
-				`Please ensure your server is running and accessible.\n\n` +
-				`If using a physical device, make sure it can reach your computer at ${API_BASE_URL}.\n\n` +
+		// Don't show alert on startup - just log the error
+		// This prevents the 404 popup while still allowing the app to function
+		console.warn(
+			`Could not connect to the server at ${API_BASE_URL}/books/\n` +
 				`Error: ${error.message}`
 		);
 	}
@@ -48,7 +50,13 @@ const checkServerConnection = async () => {
 
 export default function App() {
 	useEffect(() => {
-		checkServerConnection();
+		// Add a small delay before checking server connectivity
+		// This gives the app time to fully initialize
+		const timer = setTimeout(() => {
+			checkServerConnection();
+		}, 1000);
+
+		return () => clearTimeout(timer);
 	}, []);
 
 	// Custom back button that navigates to HoME instead of previous screen

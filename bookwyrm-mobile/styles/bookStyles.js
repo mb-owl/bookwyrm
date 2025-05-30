@@ -42,33 +42,88 @@ export default StyleSheet.create({
 		color: colors.textSecondary,
 	},
 
-	// Book cover styles
+	// Cover image styles
 	coverContainer: {
 		alignItems: "center",
-		marginVertical: spacing.large,
+		justifyContent: "center",
+		marginVertical: 16,
+		minHeight: 250,
 	},
-
 	coverImage: {
 		width: 200,
 		height: 300,
-		borderRadius: borderRadius.medium,
-		...shadows.medium,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: "#ddd",
+		backgroundColor: "#f8f8f8",
 	},
-
+	generatedCoverContainer: {
+		position: "relative",
+		width: 200,
+		height: 300,
+	},
+	generatedCoverLabel: {
+		position: "absolute",
+		bottom: 0,
+		right: 0,
+		backgroundColor: "rgba(0,0,0,0.6)",
+		color: "white",
+		padding: 4,
+		fontSize: 10,
+		borderTopLeftRadius: 4,
+	},
 	noCoverContainer: {
 		width: 200,
 		height: 300,
-		borderRadius: borderRadius.medium,
-		backgroundColor: colors.lightGrey,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: "#ddd",
+		backgroundColor: "#f8f8f8",
 		justifyContent: "center",
 		alignItems: "center",
-		borderWidth: 1,
-		borderColor: colors.border,
 	},
-
 	noCoverText: {
-		color: colors.textSecondary,
-		fontSize: typography.fontSize.default,
+		fontSize: 16,
+		color: "#999",
+		textAlign: "center",
+		paddingHorizontal: 10,
+	},
+	coverLoadingContainer: {
+		width: 200,
+		height: 300,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: "#ddd",
+		backgroundColor: "#f8f8f8",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	coverLoadingText: {
+		marginTop: 10,
+		fontSize: 14,
+		color: "#666",
+	},
+	findCoverButton: {
+		marginTop: 15,
+		backgroundColor: "#007bff",
+		paddingVertical: 8,
+		paddingHorizontal: 12,
+		borderRadius: 4,
+	},
+	findCoverButtonText: {
+		color: "white",
+		fontSize: 14,
+		fontWeight: "500",
+	},
+	coverError: {
+		borderColor: "#ffcccc",
+		backgroundColor: "#fff5f5",
+	},
+	coverErrorText: {
+		color: "#cc0000",
+		fontSize: 12,
+		marginTop: 5,
+		textAlign: "center",
 		fontStyle: "italic",
 	},
 
@@ -335,15 +390,23 @@ export default StyleSheet.create({
 		flexDirection: "row",
 		flexWrap: "wrap",
 		justifyContent: "flex-start",
-		marginTop: spacing.small,
+		marginVertical: 10,
 	},
 
 	photoContainer: {
-		width: "31%",
+		width: "31%" /* About 3 photos per row with spacing */,
 		aspectRatio: 1,
 		margin: "1%",
-		borderRadius: borderRadius.small,
+		borderRadius: 8,
 		overflow: "hidden",
+		backgroundColor: "#f0f0f0",
+		// Add shadow for better visual appearance
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.1,
+		shadowRadius: 3,
+		elevation: 2,
+		position: "relative" /* For loading indicators */,
 	},
 
 	photoThumbnail: {
@@ -351,66 +414,33 @@ export default StyleSheet.create({
 		height: "100%",
 	},
 
-	photoViewerContainer: {
-		flex: 1,
-		backgroundColor: "rgba(0,0,0,0.9)",
-		justifyContent: "center",
-		alignItems: "center",
-	},
-
-	fullSizePhoto: {
-		width: "90%",
-		height: "70%",
-	},
-
-	closeButton: {
+	photoLoadingIndicator: {
 		position: "absolute",
-		top: 40,
-		right: 20,
-		backgroundColor: "rgba(255,255,255,0.3)",
-		width: 40,
-		height: 40,
-		borderRadius: 20,
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
 		justifyContent: "center",
 		alignItems: "center",
-		zIndex: 10,
+		backgroundColor: "rgba(0,0,0,0.1)",
 	},
 
-	closeButtonText: {
-		color: colors.white,
-		fontSize: 24,
-		fontWeight: typography.fontWeight.bold,
-	},
-
-	photoNavigation: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		width: "80%",
-		paddingVertical: spacing.large,
-	},
-
-	photoNavButton: {
-		backgroundColor: "rgba(255,255,255,0.3)",
-		width: 50,
-		height: 50,
-		borderRadius: 25,
+	photoError: {
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
 		justifyContent: "center",
 		alignItems: "center",
+		backgroundColor: "#f8d7da",
 	},
 
-	disabledNavButton: {
-		opacity: 0.3,
-	},
-
-	photoNavButtonText: {
-		color: colors.white,
-		fontSize: 24,
-	},
-
-	photoCounter: {
-		color: colors.white,
-		fontSize: typography.fontSize.medium,
+	photoErrorText: {
+		color: "#721c24",
+		fontSize: 10,
+		textAlign: "center",
+		padding: 4,
 	},
 
 	// Add styles for genre badges

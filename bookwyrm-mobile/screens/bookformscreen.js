@@ -1052,12 +1052,11 @@ export default function BookFormScreen({ route, navigation }) {
 			formData.append("author", author);
 
 			// FIXED: Only send the first genre to match backend model expectations
-			// The backend model expects a single genre choice, not a comma-separated list
 			if (genres && genres.length > 0) {
 				formData.append("genre", genres[0]); // Send only the first/primary genre
 				console.log("Sending primary genre:", genres[0]);
 
-				// Store all genres in a custom field for potential future use
+				// Store all additional genres in a separate field
 				if (genres.length > 1) {
 					formData.append("additional_genres", genres.slice(1).join(","));
 					console.log("Additional genres:", genres.slice(1).join(","));
@@ -1065,9 +1064,6 @@ export default function BookFormScreen({ route, navigation }) {
 			} else {
 				formData.append("genre", "unknown");
 			}
-
-			// ISBN is optional
-			formData.append("isbn", "");
 
 			// Format the book notes with improved handling
 			let combinedNotes = "";
@@ -1092,8 +1088,6 @@ export default function BookFormScreen({ route, navigation }) {
 			formData.append("is_read", isRead ? "true" : "false");
 			formData.append("toBeRead", toBeRead ? "true" : "false");
 			formData.append("shelved", shelved ? "true" : "false");
-
-			// Add new boolean values for status
 			formData.append("currently_reading", currentlyReading ? "true" : "false");
 			formData.append("did_not_finish", didNotFinish ? "true" : "false");
 			formData.append("recommended_to_me", recommendedToMe ? "true" : "false");
@@ -1115,22 +1109,41 @@ export default function BookFormScreen({ route, navigation }) {
 
 			formData.append("emoji", emoji || "📚");
 
-			// Add each photo to the form data
+			// Add each photo to the form data with improved debugging
 			myBookPhotos.forEach((photo, index) => {
-				formData.append(`book_photo_${index}`, {
+				console.log(`Adding photo ${index}:`, photo.uri);
+
+				// Ensure we're providing a proper file name with extension
+				const fileName = photo.name || `photo-${Date.now()}-${index}.jpg`;
+				console.log(`Using filename: ${fileName}`);
+
+				// Create a proper photo object
+				const photoObj = {
 					uri: photo.uri,
 					type: "image/jpeg",
-					name: photo.name || `photo-${index}.jpg`,
-				});
+					name: fileName,
+				};
+
+				console.log(`Photo object:`, JSON.stringify(photoObj));
+				formData.append(`book_photo_${index}`, photoObj);
 			});
 
 			// Add the count of photos for easier processing on server
 			formData.append("book_photo_count", myBookPhotos.length.toString());
+			console.log(`Added ${myBookPhotos.length} photos to form data`);
+
+			// When editing and replacing photos, let the server know
+			if (editingBook && myBookPhotos.length > 0) {
+				formData.append("replace_photos", "true");
+			}
 
 			// Determine the API endpoint with proper trailing slash
+			const baseUrl = API_BASE_URL.endsWith("/")
+				? API_BASE_URL
+				: `${API_BASE_URL}/`;
 			let url = editingBook
-				? `${API_BASE_URL}/books/${editingBook.id}/`
-				: `${API_BASE_URL}/books/`;
+				? `${baseUrl}books/${editingBook.id}/`
+				: `${baseUrl}books/`;
 
 			// Ensure URL has trailing slash for Django
 			if (!url.endsWith("/")) {
@@ -1150,14 +1163,14 @@ export default function BookFormScreen({ route, navigation }) {
 				}
 			}
 
-			// Submit the form with proper headers
+			// IMPROVED: Submit with explicit content type
 			const response = await fetch(url, {
 				method: method,
 				body: formData,
 				headers: {
-					// Don't set Content-Type header when sending FormData
-					// React Native will set it automatically with the boundary
 					Accept: "application/json",
+					// Don't explicitly set Content-Type when using FormData
+					// React Native will set it with proper boundary
 				},
 			});
 

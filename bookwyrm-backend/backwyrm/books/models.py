@@ -102,6 +102,7 @@ class Book(models.Model):
     language = models.CharField(max_length=50, blank=True, null=True)
     publisher = models.CharField(max_length=255, blank=True, null=True)
     page_count = models.PositiveIntegerField(blank=True, null=True)
+    publication_date = models.DateField(blank=True, null=True)  # New field for publication date
     
     # User-added metadata
     vibes = models.CharField(max_length=255, blank=True, null=True)
@@ -124,6 +125,22 @@ class Book(models.Model):
             return Genre.objects.get(code=self.genre)
         except Genre.DoesNotExist:
             return Genre.objects.get(code='unknown')
+
+
+# New model for book photos
+class BookPhoto(models.Model):
+    """
+    Model to store photos related to books uploaded by users.
+    """
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='photos')
+    photo = models.ImageField(upload_to='book_photos/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Photo for {self.book.title}"
+    
+    class Meta:
+        ordering = ['-uploaded_at']
 
 
 # Ensure all genres from GENRE_CHOICES exist in the database

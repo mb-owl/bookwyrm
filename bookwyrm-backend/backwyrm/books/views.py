@@ -2,14 +2,117 @@ from django.shortcuts import render
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Book, Genre
+from .models import Book, Genre, BookPhoto
 from .serializers import BookSerializer, GenreSerializer
 
 # Create your views here.
 class BookViewSet(viewsets.ModelViewSet):
-    queryset = Book.objects.all().order_by('-created_at')  # Order by creation date, newest first
-    permission_classes = [permissions.AllowAny]  # Allow any user to access this view
+    """
+    API endpoint for books
+    """
+    queryset = Book.objects.all()
     serializer_class = BookSerializer
+    
+    def get_serializer_context(self):
+        """Add request to serializer context for URL generation"""
+        context = super().get_serializer_context()
+        context.update({"request": self.request})
+        return context
+    
+    def create(self, request, *args, **kwargs):
+        """Create a new book with optional photos"""
+        try:
+            # Log incoming data for debugging
+            print(f"Creating book with data: {request.data}")
+            
+            # Get photo count from request
+            photo_count = int(request.data.get('book_photo_count', 0))
+            print(f"Photo count: {photo_count}")
+            
+            # Process book data first
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            book = serializer.save()
+            
+            # Process and save photos if any exist
+            if photo_count > 0:
+                for i in range(photo_count):
+                    photo_field = f'book_photo_{i}'
+                    if photo_field in request.FILES:
+                        # Log photo data
+                        photo_file = request.FILES[photo_field]
+                        print(f"Processing photo {i}: {photo_file.name}, size: {photo_file.size}")
+                        
+                        # Create BookPhoto object with the uploaded file
+                        book_photo = BookPhoto.objects.create(
+                            book=book, 
+                            photo=photo_file
+                        )
+                        print(f"Created photo with ID: {book_photo.id}")
+            
+            # Return the serialized book including the photos
+            serializer = self.get_serializer(book)
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        except Exception as e:
+            print(f"Error creating book: {str(e)}")
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    def update(self, request, *args, **kwargs):
+        """Update a book with optional photos"""
+        try:
+            print(f"Updating book with data: {request.data}")
+            
+            partial = kwargs.pop('partial', False)
+            instance = self.get_object()
+            
+            # Get photo count from request
+            photo_count = int(request.data.get('book_photo_count', 0))
+            print(f"Photo count: {photo_count}")
+            
+            # Process book data first
+            serializer = self.get_serializer(instance, data=request.data, partial=partial)
+            serializer.is_valid(raise_exception=True)
+            book = serializer.save()
+            
+            # Process photos if any exist
+            if photo_count > 0:
+                # Remove existing photos if we're replacing them
+                # Only when explicitly specified or in a full update
+                if not partial or request.data.get('replace_photos') == 'true':
+                    print(f"Deleting existing photos for book: {book.id}")
+                    BookPhoto.objects.filter(book=book).delete()
+                
+                # Add the new photos
+                for i in range(photo_count):
+                    photo_field = f'book_photo_{i}'
+                    if photo_field in request.FILES:
+                        # Log photo data
+                        photo_file = request.FILES[photo_field]
+                        print(f"Processing photo {i}: {photo_file.name}, size: {photo_file.size}")
+                        
+                        # Create BookPhoto object with the uploaded file
+                        book_photo = BookPhoto.objects.create(
+                            book=book, 
+                            photo=photo_file
+                        )
+                        print(f"Created photo with ID: {book_photo.id}")
+            
+            if getattr(instance, '_prefetched_objects_cache', None):
+                # If 'prefetch_related' has been applied, clear the cache
+                instance._prefetched_objects_cache = {}
+            
+            # Return the serialized book including the photos
+            serializer = self.get_serializer(book)
+            return Response(serializer.data)
+        except Exception as e:
+            print(f"Error updating book: {str(e)}")
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    def partial_update(self, request, *args, **kwargs):
+        """Partial update for books"""
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
 
 class GenreViewSet(viewsets.ModelViewSet):
     """

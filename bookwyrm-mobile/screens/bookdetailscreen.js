@@ -9,10 +9,16 @@ import {
 	ActivityIndicator,
 	Animated,
 	Modal,
+	StyleSheet,
 } from "react-native";
 
 // Import API configuration and components
-import { API_BASE_URL, getMediaUrl } from "../utils/apiConfig";
+import {
+	API_BASE_URL,
+	getMediaUrl,
+	getBookPhotosUrl,
+	getApiEndpoint,
+} from "../utils/apiConfig";
 import HamburgerMenu from "../components/HamburgerMenu";
 
 // Import styles
@@ -35,12 +41,25 @@ export default function BookDetailScreen({ route, navigation }) {
 	const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
 	const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
 
+	// Add state for generated cover URL
+	const [generatedCoverUrl, setGeneratedCoverUrl] = useState(null);
+	const [coverLoading, setCoverLoading] = useState(false);
+	const [coverError, setCoverError] = useState(false);
+	const [autoFetchingCover, setAutoFetchingCover] = useState(false);
+
 	// Fetch book details if we only have the ID
 	useEffect(() => {
 		if (!initialBook && bookId) {
 			fetchBookDetails();
+		} else if (
+			initialBook &&
+			(!initialBook.cover || initialBook.cover === "")
+		) {
+			// Auto-fetch cover for initial book if needed
+			setAutoFetchingCover(true);
+			fetchBookCover(initialBook.title, initialBook.author);
 		}
-	}, [bookId]);
+	}, [bookId, initialBook]);
 
 	// Log book data for debugging
 	useEffect(() => {
@@ -77,7 +96,8 @@ export default function BookDetailScreen({ route, navigation }) {
 			formData.append("favorite", updatedBook.favorite ? "true" : "false");
 
 			// Update only the favorite field
-			const response = await fetch(`${API_BASE_URL}/books/${book.id}/`, {
+			const endpoint = getApiEndpoint(`books/${book.id}`);
+			const response = await fetch(endpoint, {
 				method: "PATCH",
 				body: formData,
 			});
@@ -97,7 +117,12 @@ export default function BookDetailScreen({ route, navigation }) {
 	const fetchBookDetails = async () => {
 		try {
 			setLoading(true);
-			const response = await fetch(`${API_BASE_URL}/books/${bookId}/`);
+
+			// Use helper function to get proper endpoint
+			const endpoint = getApiEndpoint(`books/${bookId}`);
+			console.log("Fetching book details from:", endpoint);
+
+			const response = await fetch(endpoint);
 
 			if (!response.ok) {
 				throw new Error(`Failed to fetch book: ${response.status}`);
@@ -105,12 +130,235 @@ export default function BookDetailScreen({ route, navigation }) {
 
 			const data = await response.json();
 			console.log("Received book data:", JSON.stringify(data, null, 2));
+
+			// Process the photos for display with improved debugging
+			if (data.photos && data.photos.length > 0) {
+				console.log("Found photos for book:", data.photos.length);
+				console.log(
+					"Photos data structure:",
+					typeof data.photos,
+					Array.isArray(data.photos)
+				);
+				console.log("First photo example:", JSON.stringify(data.photos[0]));
+
+				// Get the media URL - now points directly to book_photos directory
+				const mediaUrl = getMediaUrl();
+				console.log(`Media URL base:`, mediaUrl);
+
+				// Convert the photos array to the format expected by the component
+				const formattedPhotos = data.photos
+					.map((photo, index) => {
+						// Handle both object structure and string structure
+						const photoUrl =
+							photo.photo_url ||
+							photo.photo ||
+							(typeof photo === "string" ? photo : null);
+
+						if (!photoUrl) {
+							console.error(`Photo ${index} has no valid URL property:`, photo);
+							return null;
+						}
+
+						console.log(`Photo ${index} original path:`, photoUrl);
+
+						// If it's already a full URL, use it directly
+						if (photoUrl && photoUrl.startsWith("http")) {
+							console.log(`Photo ${index} is already a full URL`);
+							return { uri: photoUrl };
+						}
+
+						// Get just the filename part
+						const filename = photoUrl.split("/").pop();
+
+						// Direct URL to the photo - no need to append book_photos anymore
+						const photoUri = `${mediaUrl}${filename}`;
+						console.log(`Photo ${index} final URI:`, photoUri);
+
+						return {
+							uri: photoUri,
+							id: photo.id || index,
+							originalPath: photoUrl,
+						};
+					})
+					.filter(Boolean); // Remove any null entries
+
+				// Add the photos to the book object
+				data.myBookPhotos = formattedPhotos;
+			} else {
+				console.log("No photos found for this book");
+				data.myBookPhotos = [];
+			}
+
+			// After loading book data, fetch a cover image if needed
+			if (data && (!data.cover || data.cover === "")) {
+				setAutoFetchingCover(true);
+				fetchBookCover(data.title, data.author);
+			}
+
 			setBook(data);
 		} catch (err) {
 			console.error("Error fetching book details:", err);
 			setError(err.message);
 		} finally {
 			setLoading(false);
+		}
+	};
+
+	// Enhanced Open Library API function
+	const fetchOpenLibraryCover = async (title, author) => {
+		try {
+			console.log("Fetching cover from Open Library API");
+			// Use the improved Open Library search endpoint
+			const openLibraryUrl = `https://openlibrary.org/search.json?title=${encodeURIComponent(
+				title
+			)}&author=${encodeURIComponent(author || "")}&limit=1`;
+
+			// Add timeout to prevent hanging requests
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+			const response = await fetch(openLibraryUrl, {
+				method: "GET",
+				headers: {
+					Accept: "application/json",
+					"User-Agent": "BookWyrm-Mobile/1.0",
+				},
+				signal: controller.signal,
+			});
+
+			clearTimeout(timeoutId);
+
+			if (!response.ok) {
+				throw new Error(`Open Library API error: ${response.status}`);
+			}
+
+			const data = await response.json();
+			console.log("Open Library response received");
+
+			// Enhanced cover search with multiple methods
+			if (data.docs && data.docs.length > 0) {
+				// Method 1: Try for cover_i first (most reliable)
+				if (data.docs[0].cover_i) {
+					const coverId = data.docs[0].cover_i;
+					// Use large size for better quality
+					const coverUrl = `https://covers.openlibrary.org/b/id/${coverId}-L.jpg`;
+					console.log("Found Open Library cover (by ID):", coverUrl);
+					setGeneratedCoverUrl(coverUrl);
+					return true;
+				}
+
+				// Method 2: Try ISBN
+				else if (data.docs[0].isbn && data.docs[0].isbn.length > 0) {
+					const isbn = data.docs[0].isbn[0];
+					const coverUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`;
+					console.log("Found Open Library cover (by ISBN):", coverUrl);
+					setGeneratedCoverUrl(coverUrl);
+					return true;
+				}
+
+				// Method 3: Try OCLC
+				else if (data.docs[0].oclc && data.docs[0].oclc.length > 0) {
+					const oclc = data.docs[0].oclc[0];
+					const coverUrl = `https://covers.openlibrary.org/b/oclc/${oclc}-L.jpg`;
+					console.log("Found Open Library cover (by OCLC):", coverUrl);
+					setGeneratedCoverUrl(coverUrl);
+					return true;
+				}
+
+				// Method 4: Try LCCN
+				else if (data.docs[0].lccn && data.docs[0].lccn.length > 0) {
+					const lccn = data.docs[0].lccn[0];
+					const coverUrl = `https://covers.openlibrary.org/b/lccn/${lccn}-L.jpg`;
+					console.log("Found Open Library cover (by LCCN):", coverUrl);
+					setGeneratedCoverUrl(coverUrl);
+					return true;
+				}
+			}
+
+			throw new Error("No suitable Open Library cover found");
+		} catch (error) {
+			// Provide specific error messages for debugging
+			if (error.name === "AbortError") {
+				console.error("Open Library API request timed out");
+			} else if (error.message.includes("Network request failed")) {
+				console.error(
+					"Network error fetching from Open Library API - check internet connection"
+				);
+			} else {
+				console.error("Open Library cover error:", error);
+			}
+			throw error;
+		}
+	};
+
+	// Function to fetch cover from LibraryThing API (fallback)
+	const fetchLibraryThingCover = async (title, author) => {
+		try {
+			console.log("Trying LibraryThing Cover service");
+
+			// Create a query string from title and author
+			const query = encodeURIComponent(`${title} ${author || ""}`).substring(
+				0,
+				100
+			);
+
+			// Use LibraryThing's cover service which doesn't require API key for basic usage
+			const coverUrl = `https://covers.openlibrary.org/a/query/${query}-L.jpg`;
+
+			console.log("Found LibraryThing cover:", coverUrl);
+			setGeneratedCoverUrl(coverUrl);
+			return true;
+		} catch (error) {
+			console.error("LibraryThing cover error:", error);
+			throw error;
+		}
+	};
+
+	// Main function to fetch book cover - SIMPLIFIED to use only Open Library
+	const fetchBookCover = async (title, author) => {
+		if (!title) return;
+
+		try {
+			setCoverLoading(true);
+			setCoverError(false);
+
+			console.log(
+				`Searching for cover for "${title}" by "${author || "Unknown author"}"`
+			);
+
+			// Try Open Library API as the primary source
+			try {
+				await fetchOpenLibraryCover(title, author);
+				return; // Success! Return early
+			} catch (openLibraryError) {
+				console.log("Open Library attempt failed, trying LibraryThing...");
+			}
+
+			// If Open Library fails, try LibraryThing
+			try {
+				await fetchLibraryThingCover(title, author);
+				return; // Success! Return early
+			} catch (libraryThingError) {
+				console.log("LibraryThing attempt failed");
+			}
+
+			// If all APIs fail, generate a placeholder cover with title and author
+			console.log("All cover sources failed, using placeholder");
+			const placeholderUrl = `https://via.placeholder.com/200x300/e0e0e0/333333?text=${encodeURIComponent(
+				title
+			)}`;
+			setGeneratedCoverUrl(placeholderUrl);
+		} catch (error) {
+			console.error("All cover fetch attempts failed:", error);
+			setCoverError(true);
+
+			// Use a simple placeholder as last resort
+			setGeneratedCoverUrl(
+				`https://via.placeholder.com/200x300/e0e0e0/333333?text=No+Cover`
+			);
+		} finally {
+			setCoverLoading(false);
+			setAutoFetchingCover(false);
 		}
 	};
 
@@ -156,7 +404,8 @@ export default function BookDetailScreen({ route, navigation }) {
 				onPress: async () => {
 					try {
 						setLoading(true);
-						const response = await fetch(`${API_BASE_URL}/books/${book.id}/`, {
+						const endpoint = getApiEndpoint(`books/${book.id}`);
+						const response = await fetch(endpoint, {
 							method: "DELETE",
 						});
 
@@ -349,6 +598,91 @@ export default function BookDetailScreen({ route, navigation }) {
 		);
 	};
 
+	// Add new renderPhotos constant
+	const renderPhotos = () => {
+		if (!book || !book.photos || book.photos.length === 0) {
+			// Check both the original photos array and the processed myBookPhotos
+			if (!hasPhotos) {
+				console.log("No photos to render");
+				return null;
+			}
+		}
+
+		return (
+			<View style={baseStyles.sectionContainer}>
+				<Text style={baseStyles.sectionTitle}>Book Photos</Text>
+				<View style={baseStyles.sectionDivider} />
+
+				<View style={bookStyles.photoGallery}>
+					{safeBookPhotos.map((photo, index) => (
+						<TouchableOpacity
+							key={photo.id || index}
+							style={bookStyles.photoContainer}
+							onPress={() => {
+								setSelectedPhotoIndex(index);
+								setPhotoViewerVisible(true);
+							}}
+						>
+							<Image
+								source={{ uri: photo.uri }}
+								style={bookStyles.photoThumbnail}
+								resizeMode="cover"
+								onError={(e) => {
+									console.error(
+										`Error loading photo ${index}:`,
+										e.nativeEvent.error
+									);
+									console.error(`URI that failed:`, photo.uri);
+
+									// Direct fallback with media URL
+									const fallbackUri = `${getMediaUrl()}${
+										photo.originalPath?.split("/").pop() || `photo_${index}.jpg`
+									}`;
+									console.log(`Trying direct fallback URI: ${fallbackUri}`);
+
+									// Update the photo URI
+									safeBookPhotos[index].uri = fallbackUri;
+									setBook({ ...book });
+								}}
+							/>
+							<View style={styles.photoIndexContainer}>
+								<Text style={styles.photoIndexText}>{index + 1}</Text>
+							</View>
+						</TouchableOpacity>
+					))}
+				</View>
+
+				{/* Debug info in development */}
+				{__DEV__ && (
+					<View style={styles.debugContainer}>
+						<Text style={styles.debugTitle}>Photo Debug Info:</Text>
+						<Text style={styles.debugText}>
+							Media URL Base: {getMediaUrl()}
+						</Text>
+						<Text style={styles.debugText}>
+							Photos Count: {safeBookPhotos.length}
+						</Text>
+						<Text style={styles.debugText}>
+							Original Photos Count: {book.photos?.length || 0}
+						</Text>
+						{safeBookPhotos.map((photo, i) => (
+							<View key={i}>
+								<Text style={styles.debugText} numberOfLines={1}>
+									Photo {i + 1} URI: {photo.uri}
+								</Text>
+								{photo.originalPath && (
+									<Text style={styles.debugText} numberOfLines={1}>
+										Original Path: {photo.originalPath}
+									</Text>
+								)}
+							</View>
+						))}
+					</View>
+				)}
+			</View>
+		);
+	};
+
 	// Show loading state
 	if (loading) {
 		return (
@@ -400,21 +734,70 @@ export default function BookDetailScreen({ route, navigation }) {
 			style={baseStyles.container}
 			contentContainerStyle={baseStyles.scrollViewContent}
 		>
-			{/* Book cover image */}
+			{/* Book cover image - UPDATED with improved error handling */}
 			<View style={bookStyles.coverContainer}>
 				{book.cover ? (
 					<Image
 						source={{
 							uri: book.cover.startsWith("http")
 								? book.cover
-								: `${getMediaUrl()}covers/${book.cover.split("/").pop()}`,
+								: `${getMediaUrl()}${book.cover.split("/").pop()}`,
 						}}
 						style={bookStyles.coverImage}
 						resizeMode="contain"
+						onError={(e) => {
+							console.error(
+								"Error loading uploaded cover image:",
+								e.nativeEvent.error
+							);
+							// If uploaded cover fails, try to fetch a cover online
+							if (!generatedCoverUrl && !autoFetchingCover && !coverLoading) {
+								console.log(
+									"Uploaded cover failed to load, trying to find cover online"
+								);
+								fetchBookCover(book.title, book.author);
+							}
+						}}
 					/>
+				) : generatedCoverUrl ? (
+					<View style={bookStyles.generatedCoverContainer}>
+						<Image
+							source={{ uri: generatedCoverUrl }}
+							style={bookStyles.coverImage}
+							resizeMode="contain"
+							onError={(e) => {
+								console.error(
+									"Error loading generated cover image:",
+									e.nativeEvent.error
+								);
+								console.error("Failed URL:", generatedCoverUrl);
+								setCoverError(true);
+								// Set a placeholder image if the generated cover fails
+								setGeneratedCoverUrl(
+									"https://via.placeholder.com/200x300/e0e0e0/333333?text=Cover+Error"
+								);
+							}}
+						/>
+						<Text style={bookStyles.generatedCoverLabel}>Generated Cover</Text>
+					</View>
+				) : coverLoading || autoFetchingCover ? (
+					<View style={bookStyles.coverLoadingContainer}>
+						<ActivityIndicator size="large" color={colors.primary} />
+						<Text style={bookStyles.coverLoadingText}>Finding cover...</Text>
+					</View>
 				) : (
 					<View style={bookStyles.noCoverContainer}>
-						<Text style={bookStyles.noCoverText}>No cover image</Text>
+						<Text style={bookStyles.noCoverText}>
+							{coverError ? "Cover not found" : "No cover image"}
+						</Text>
+						{!coverLoading && !book.cover && !generatedCoverUrl && (
+							<TouchableOpacity
+								style={bookStyles.findCoverButton}
+								onPress={() => fetchBookCover(book.title, book.author)}
+							>
+								<Text style={bookStyles.findCoverButtonText}>Find Cover</Text>
+							</TouchableOpacity>
+						)}
 					</View>
 				)}
 			</View>
@@ -623,7 +1006,10 @@ export default function BookDetailScreen({ route, navigation }) {
 				</View>
 			)}
 
-			{/* Deeper Look button */}
+			{/* Replace the inline photo section with the renderPhotos constant */}
+			{renderPhotos()}
+
+			{/* Deeper Look button - Remains below the photos section */}
 			<TouchableOpacity
 				style={bookStyles.deeperLookButton}
 				onPress={toggleDeeperDetails}
@@ -701,37 +1087,6 @@ export default function BookDetailScreen({ route, navigation }) {
 				)}
 			</Animated.View>
 
-			{/* Add Me and My Books section - after the primary details */}
-			{hasPhotos && (
-				<View style={baseStyles.sectionContainer}>
-					<Text style={baseStyles.sectionTitle}>Me and My Books</Text>
-					<View style={baseStyles.sectionDivider} />
-
-					<View style={bookStyles.photoGallery}>
-						{safeBookPhotos.map((photo, index) => (
-							<TouchableOpacity
-								key={index}
-								style={bookStyles.photoContainer}
-								onPress={() => {
-									setSelectedPhotoIndex(index);
-									setPhotoViewerVisible(true);
-								}}
-							>
-								<Image
-									source={{
-										uri:
-											photo.uri ||
-											`${getMediaUrl()}book_photos/${photo.split("/").pop()}`,
-									}}
-									style={bookStyles.photoThumbnail}
-									resizeMode="cover"
-								/>
-							</TouchableOpacity>
-						))}
-					</View>
-				</View>
-			)}
-
 			{/* Photo Viewer Modal */}
 			<Modal
 				visible={photoViewerVisible}
@@ -746,20 +1101,47 @@ export default function BookDetailScreen({ route, navigation }) {
 						<Text style={bookStyles.closeButtonText}>×</Text>
 					</TouchableOpacity>
 
-					{hasPhotos && (
-						<Image
-							source={{
-								uri:
-									safeBookPhotos[selectedPhotoIndex].uri ||
-									`${getMediaUrl()}book_photos/${safeBookPhotos[
-										selectedPhotoIndex
-									]
-										.split("/")
-										.pop()}`,
-							}}
-							style={bookStyles.fullSizePhoto}
-							resizeMode="contain"
-						/>
+					{hasPhotos && selectedPhotoIndex < safeBookPhotos.length && (
+						<>
+							<Image
+								source={{ uri: safeBookPhotos[selectedPhotoIndex].uri }}
+								style={bookStyles.fullSizePhoto}
+								resizeMode="contain"
+								onError={(e) => {
+									console.error(
+										`Error loading full photo:`,
+										e.nativeEvent.error
+									);
+									console.error(
+										`URI that failed:`,
+										safeBookPhotos[selectedPhotoIndex].uri
+									);
+
+									// Try fallback URIs if available
+									if (
+										safeBookPhotos[selectedPhotoIndex].backupUris &&
+										safeBookPhotos[selectedPhotoIndex].backupUris.length > 0
+									) {
+										const nextUri =
+											safeBookPhotos[selectedPhotoIndex].backupUris.shift();
+										console.log(
+											`Trying fallback URI for full photo: ${nextUri}`
+										);
+
+										// Update the photo URI to try the fallback
+										safeBookPhotos[selectedPhotoIndex].uri = nextUri;
+
+										// Force a refresh
+										setBook({ ...book });
+									}
+								}}
+							/>
+							{__DEV__ && (
+								<Text style={styles.debugPhotoUrl}>
+									{safeBookPhotos[selectedPhotoIndex].uri}
+								</Text>
+							)}
+						</>
 					)}
 
 					{/* Photo navigation */}
@@ -805,3 +1187,63 @@ export default function BookDetailScreen({ route, navigation }) {
 		</ScrollView>
 	);
 }
+
+// Add some debug styles at the end of your existing styles
+const styles = StyleSheet.create({
+	debugPhotoUrl: {
+		fontSize: 8,
+		color: "rgba(255,255,255,0.6)",
+		position: "absolute",
+		bottom: 10,
+		left: 10,
+		right: 10,
+		textAlign: "center",
+		backgroundColor: "rgba(0,0,0,0.5)",
+		padding: 2,
+	},
+	debugContainer: {
+		marginTop: 10,
+		padding: 10,
+		backgroundColor: "#f0f0f0",
+		borderRadius: 5,
+		borderWidth: 1,
+		borderColor: "#ddd",
+	},
+	debugTitle: {
+		fontWeight: "bold",
+		marginBottom: 5,
+		fontSize: 12,
+	},
+	debugText: {
+		fontSize: 10,
+		color: "#666",
+		marginBottom: 2,
+	},
+	photoIndexContainer: {
+		position: "absolute",
+		bottom: 2,
+		right: 2,
+		backgroundColor: "rgba(0,0,0,0.5)",
+		borderRadius: 10,
+		width: 20,
+		height: 20,
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	photoIndexText: {
+		color: "white",
+		fontSize: 10,
+		fontWeight: "bold",
+	},
+	photoOverlay: {
+		position: "absolute",
+		bottom: 2,
+		right: 2,
+		backgroundColor: "rgba(0,0,0,0.5)",
+		borderRadius: 10,
+		width: 20,
+		height: 20,
+		justifyContent: "center",
+		alignItems: "center",
+	},
+});
