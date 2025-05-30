@@ -144,6 +144,24 @@ class BookPhoto(models.Model):
         ordering = ['-uploaded_at']
 
 
+# New model for tracking reading days
+class ReadingDay(models.Model):
+    """
+    Model to track days when the user has read.
+    Each record represents a single day of reading.
+    """
+    read_date = models.DateField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Reading on {self.read_date}"
+    
+    class Meta:
+        ordering = ['-read_date']
+        verbose_name = 'Reading Day'
+        verbose_name_plural = 'Reading Days'
+
+
 # Ensure all genres from GENRE_CHOICES exist in the database
 @receiver(post_migrate)
 def create_default_genres(sender, **kwargs):

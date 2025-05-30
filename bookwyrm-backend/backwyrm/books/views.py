@@ -2,8 +2,10 @@ from django.shortcuts import render
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Book, Genre, BookPhoto
+from .models import Book, Genre, BookPhoto, ReadingDay
 from .serializers import BookSerializer, GenreSerializer
+from rest_framework.views import APIView
+from datetime import date, datetime
 
 # Create your views here.
 class BookViewSet(viewsets.ModelViewSet):
@@ -159,3 +161,60 @@ class GenreViewSet(viewsets.ModelViewSet):
             })
             
         return Response(results)
+
+class ReadingStatsView(APIView):
+    """
+    API view to handle reading statistics
+    """
+    def get(self, request):
+        """Get reading statistics"""
+        # Get the current year
+        current_year = date.today().year
+        
+        # Count total reading days for the current year
+        total_days = ReadingDay.objects.filter(
+            read_date__year=current_year
+        ).count()
+        
+        return Response({
+            'total_days_read': total_days,
+            'current_year': current_year
+        })
+    
+    def post(self, request):
+        """Record a new reading day"""
+        try:
+            # Get the date from request or use today
+            read_date_str = request.data.get('read_date')
+            if read_date_str:
+                read_date = datetime.strptime(read_date_str, '%Y-%m-%d').date()
+            else:
+                read_date = date.today()
+            
+            # Check if already recorded
+            if ReadingDay.objects.filter(read_date=read_date).exists():
+                return Response(
+                    {'detail': 'Reading already recorded for this date'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Create new reading day record
+            ReadingDay.objects.create(read_date=read_date)
+            
+            # Get updated count for current year
+            current_year = date.today().year
+            total_days = ReadingDay.objects.filter(
+                read_date__year=current_year
+            ).count()
+            
+            return Response({
+                'success': True,
+                'read_date': read_date,
+                'total_days_read': total_days
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response(
+                {'detail': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )

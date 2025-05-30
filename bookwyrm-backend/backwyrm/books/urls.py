@@ -2,7 +2,7 @@
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import GenreViewSet
+from .views import GenreViewSet, ReadingStatsView
 
 router = DefaultRouter()
 # ...existing router registrations...
@@ -11,4 +11,5 @@ router.register(r'genres', GenreViewSet)
 urlpatterns = [
     # ...existing url patterns...
     path('', include(router.urls)),
+    path('reading-stats/', ReadingStatsView.as_view(), name='reading-stats'),
 ]
