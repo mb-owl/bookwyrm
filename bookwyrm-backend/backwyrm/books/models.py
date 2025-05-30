@@ -68,6 +68,13 @@ class Book(models.Model):
         blank=True
     )
     
+    # New field to store additional genres beyond the primary one
+    additional_genres = models.TextField(
+        blank=True, 
+        null=True, 
+        help_text="Comma-separated list of additional genres beyond the primary genre"
+    )
+    
     # Book details
     rating = models.DecimalField(
         max_digits=3, 

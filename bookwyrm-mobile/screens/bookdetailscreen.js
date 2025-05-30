@@ -8,6 +8,7 @@ import {
 	ScrollView,
 	ActivityIndicator,
 	Animated,
+	Modal,
 } from "react-native";
 
 // Import API configuration and components
@@ -29,6 +30,10 @@ export default function BookDetailScreen({ route, navigation }) {
 	// Add state to track if deeper details are visible
 	const [showDeeperDetails, setShowDeeperDetails] = useState(false);
 	const [detailsAnimation] = useState(new Animated.Value(0));
+
+	// Add state for photo viewer
+	const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
+	const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
 
 	// Fetch book details if we only have the ID
 	useEffect(() => {
@@ -197,6 +202,93 @@ export default function BookDetailScreen({ route, navigation }) {
 		);
 	};
 
+	// New function to render genres (primary + additional)
+	const renderGenres = () => {
+		// Get genre display name instead of code
+		const getGenreDisplayName = (code) => {
+			// Map of common genre codes to display names
+			const genreMap = {
+				fiction: "Fiction",
+				"non-fiction": "Non-Fiction",
+				"sci-fi": "Science Fiction",
+				fantasy: "Fantasy",
+				mystery: "Mystery",
+				biography: "Biography",
+				history: "History",
+				romance: "Romance",
+				thriller: "Thriller",
+				horror: "Horror",
+				"young-adult": "Young Adult",
+				children: "Children",
+				dystopian: "Dystopian",
+				utopian: "Utopian",
+				supernatural: "Supernatural",
+				paranormal: "Paranormal",
+				"graphic-novel": "Graphic Novel",
+				poetry: "Poetry",
+				drama: "Drama",
+				classic: "Classic",
+				unknown: "Unknown",
+			};
+
+			return genreMap[code] || code;
+		};
+
+		// Handle empty genre
+		if (
+			!book.genre &&
+			(!book.additional_genres || book.additional_genres.length === 0)
+		) {
+			return (
+				<View style={baseStyles.fieldContainer}>
+					<Text style={[baseStyles.fieldLabel, baseStyles.emptyFieldLabel]}>
+						Genres:
+					</Text>
+					<Text style={[baseStyles.fieldValue, baseStyles.emptyFieldValue]}>
+						Not specified
+					</Text>
+				</View>
+			);
+		}
+
+		// Start with primary genre
+		let genreList = [];
+		if (book.genre && book.genre !== "unknown") {
+			genreList.push(getGenreDisplayName(book.genre));
+		}
+
+		// Add additional genres if they exist
+		if (book.additional_genres) {
+			// Parse comma-separated list of additional genres
+			const additionalGenres = book.additional_genres
+				.split(",")
+				.map((g) => g.trim())
+				.filter((g) => g.length > 0 && g !== "unknown")
+				.map(getGenreDisplayName);
+
+			genreList = [...genreList, ...additionalGenres];
+		}
+
+		// Ensure we don't have duplicates
+		genreList = [...new Set(genreList)];
+
+		// Return formatted genre list
+		return (
+			<View style={baseStyles.fieldContainer}>
+				<Text style={baseStyles.fieldLabel}>
+					{genreList.length > 1 ? "Genres:" : "Genre:"}
+				</Text>
+				<View style={bookStyles.genreContainer}>
+					{genreList.map((genre, index) => (
+						<View key={index} style={bookStyles.genreBadge}>
+							<Text style={bookStyles.genreBadgeText}>{genre}</Text>
+						</View>
+					))}
+				</View>
+			</View>
+		);
+	};
+
 	// Render boolean field
 	const renderBooleanField = (label, value) => {
 		return renderField(label, value, (v) => (v ? "Yes" : "No"));
@@ -326,7 +418,9 @@ export default function BookDetailScreen({ route, navigation }) {
 				</View>
 				<View style={baseStyles.sectionDivider} />
 
-				{renderField("Genre", book.genre)}
+				{/* Replace the single genre field with our new genres display */}
+				{renderGenres()}
+
 				{renderField(
 					"Publication Year",
 					book.publication_date
@@ -566,6 +660,105 @@ export default function BookDetailScreen({ route, navigation }) {
 					</View>
 				)}
 			</Animated.View>
+
+			{/* Add Me and My Books section - after the primary details */}
+			{book.myBookPhotos && book.myBookPhotos.length > 0 && (
+				<View style={baseStyles.sectionContainer}>
+					<Text style={baseStyles.sectionTitle}>Me and My Books</Text>
+					<View style={baseStyles.sectionDivider} />
+
+					<View style={bookStyles.photoGallery}>
+						{book.myBookPhotos.map((photo, index) => (
+							<TouchableOpacity
+								key={index}
+								style={bookStyles.photoContainer}
+								onPress={() => {
+									setSelectedPhotoIndex(index);
+									setPhotoViewerVisible(true);
+								}}
+							>
+								<Image
+									source={{
+										uri:
+											photo.uri ||
+											`${getMediaUrl()}book_photos/${photo.split("/").pop()}`,
+									}}
+									style={bookStyles.photoThumbnail}
+									resizeMode="cover"
+								/>
+							</TouchableOpacity>
+						))}
+					</View>
+				</View>
+			)}
+
+			{/* Photo Viewer Modal */}
+			<Modal
+				visible={photoViewerVisible}
+				transparent={true}
+				onRequestClose={() => setPhotoViewerVisible(false)}
+			>
+				<View style={bookStyles.photoViewerContainer}>
+					<TouchableOpacity
+						style={bookStyles.closeButton}
+						onPress={() => setPhotoViewerVisible(false)}
+					>
+						<Text style={bookStyles.closeButtonText}>×</Text>
+					</TouchableOpacity>
+
+					{book.myBookPhotos && book.myBookPhotos.length > 0 && (
+						<Image
+							source={{
+								uri:
+									book.myBookPhotos[selectedPhotoIndex].uri ||
+									`${getMediaUrl()}book_photos/${book.myBookPhotos[
+										selectedPhotoIndex
+									]
+										.split("/")
+										.pop()}`,
+							}}
+							style={bookStyles.fullSizePhoto}
+							resizeMode="contain"
+						/>
+					)}
+
+					{/* Photo navigation */}
+					<View style={bookStyles.photoNavigation}>
+						<TouchableOpacity
+							style={[
+								bookStyles.photoNavButton,
+								selectedPhotoIndex === 0 && bookStyles.disabledNavButton,
+							]}
+							onPress={() =>
+								setSelectedPhotoIndex(Math.max(0, selectedPhotoIndex - 1))
+							}
+							disabled={selectedPhotoIndex === 0}
+						>
+							<Text style={bookStyles.photoNavButtonText}>←</Text>
+						</TouchableOpacity>
+
+						<Text style={bookStyles.photoCounter}>
+							{selectedPhotoIndex + 1} / {book.myBookPhotos.length}
+						</Text>
+
+						<TouchableOpacity
+							style={[
+								bookStyles.photoNavButton,
+								selectedPhotoIndex === book.myBookPhotos.length - 1 &&
+									bookStyles.disabledNavButton,
+							]}
+							onPress={() =>
+								setSelectedPhotoIndex(
+									Math.min(book.myBookPhotos.length - 1, selectedPhotoIndex + 1)
+								)
+							}
+							disabled={selectedPhotoIndex === book.myBookPhotos.length - 1}
+						>
+							<Text style={bookStyles.photoNavButtonText}>→</Text>
+						</TouchableOpacity>
+					</View>
+				</View>
+			</Modal>
 
 			{/* Bottom spacer */}
 			<View style={baseStyles.bottomSpacer} />

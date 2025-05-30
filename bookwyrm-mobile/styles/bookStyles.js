@@ -329,4 +329,109 @@ export default StyleSheet.create({
 		color: colors.primary,
 		marginLeft: spacing.tiny,
 	},
+
+	// Add photo gallery styles
+	photoGallery: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		justifyContent: "flex-start",
+		marginTop: spacing.small,
+	},
+
+	photoContainer: {
+		width: "31%",
+		aspectRatio: 1,
+		margin: "1%",
+		borderRadius: borderRadius.small,
+		overflow: "hidden",
+	},
+
+	photoThumbnail: {
+		width: "100%",
+		height: "100%",
+	},
+
+	photoViewerContainer: {
+		flex: 1,
+		backgroundColor: "rgba(0,0,0,0.9)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+
+	fullSizePhoto: {
+		width: "90%",
+		height: "70%",
+	},
+
+	closeButton: {
+		position: "absolute",
+		top: 40,
+		right: 20,
+		backgroundColor: "rgba(255,255,255,0.3)",
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		justifyContent: "center",
+		alignItems: "center",
+		zIndex: 10,
+	},
+
+	closeButtonText: {
+		color: colors.white,
+		fontSize: 24,
+		fontWeight: typography.fontWeight.bold,
+	},
+
+	photoNavigation: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		width: "80%",
+		paddingVertical: spacing.large,
+	},
+
+	photoNavButton: {
+		backgroundColor: "rgba(255,255,255,0.3)",
+		width: 50,
+		height: 50,
+		borderRadius: 25,
+		justifyContent: "center",
+		alignItems: "center",
+	},
+
+	disabledNavButton: {
+		opacity: 0.3,
+	},
+
+	photoNavButtonText: {
+		color: colors.white,
+		fontSize: 24,
+	},
+
+	photoCounter: {
+		color: colors.white,
+		fontSize: typography.fontSize.medium,
+	},
+
+	// Add styles for genre badges
+	genreContainer: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		marginTop: 4,
+	},
+
+	genreBadge: {
+		backgroundColor: "#e1f5fe",
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		borderRadius: 12,
+		marginRight: 8,
+		marginBottom: 6,
+	},
+
+	genreBadgeText: {
+		color: "#0288d1",
+		fontSize: 14,
+		fontWeight: "500",
+	},
 });

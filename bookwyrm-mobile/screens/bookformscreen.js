@@ -77,8 +77,8 @@ export default function BookFormScreen({ route, navigation }) {
 			? new Date(editingBook.publication_date).getFullYear()
 			: new Date().getFullYear()
 	);
-	const [coverImage, setCoverImage] = useState(
-		editingBook ? editingBook.coverImage : null
+	const [myBookPhotos, setMyBookPhotos] = useState(
+		editingBook ? editingBook.myBookPhotos || [] : []
 	);
 	const [uploading, setUploading] = useState(false);
 	const [showYearModal, setShowYearModal] = useState(false);
@@ -795,20 +795,46 @@ export default function BookFormScreen({ route, navigation }) {
 		setShowSearchResults(false);
 	};
 
-	const pickImage = async () => {
+	const pickImages = async () => {
 		try {
 			const result = await ImagePicker.launchImageLibraryAsync({
 				mediaTypes: ImagePicker.MediaTypeOptions.Images,
-				allowsEditing: true,
+				allowsMultipleSelection: true,
+				selectionLimit: 5, // Limit to 5 photos
 				quality: 1,
 			});
+
 			if (!result.canceled) {
-				setCoverImage(result);
+				// Get the new assets
+				const newPhotos = result.assets.map((asset) => ({
+					uri: asset.uri,
+					name: asset.fileName || `photo-${Date.now()}.jpg`,
+					type: "image/jpeg",
+				}));
+
+				// Check if adding these would exceed our limit of 5
+				if (myBookPhotos.length + newPhotos.length > 5) {
+					Alert.alert(
+						"Too Many Photos",
+						`You can only upload up to 5 photos. You already have ${myBookPhotos.length}.`
+					);
+					return;
+				}
+
+				// Add to existing photos
+				setMyBookPhotos([...myBookPhotos, ...newPhotos]);
 			}
 		} catch (error) {
-			console.error("Error picking image:", error);
-			Alert.alert("Error picking image. Please try again.");
+			console.error("Error picking images:", error);
+			Alert.alert("Error picking images. Please try again.");
 		}
+	};
+
+	// Remove a photo from the collection
+	const removePhoto = (index) => {
+		const updatedPhotos = [...myBookPhotos];
+		updatedPhotos.splice(index, 1);
+		setMyBookPhotos(updatedPhotos);
 	};
 
 	// Toggle a genre in the selection
@@ -997,9 +1023,17 @@ export default function BookFormScreen({ route, navigation }) {
 			formData.append("title", title);
 			formData.append("author", author);
 
-			// Handle genre - ensure it's a string, not an array
+			// FIXED: Only send the first genre to match backend model expectations
+			// The backend model expects a single genre choice, not a comma-separated list
 			if (genres && genres.length > 0) {
-				formData.append("genre", genres[0]);
+				formData.append("genre", genres[0]); // Send only the first/primary genre
+				console.log("Sending primary genre:", genres[0]);
+
+				// Store all genres in a custom field for potential future use
+				if (genres.length > 1) {
+					formData.append("additional_genres", genres.slice(1).join(","));
+					console.log("Additional genres:", genres.slice(1).join(","));
+				}
 			} else {
 				formData.append("genre", "unknown");
 			}
@@ -1052,6 +1086,19 @@ export default function BookFormScreen({ route, navigation }) {
 			}
 
 			formData.append("emoji", emoji || "📚");
+
+			// Add each photo to the form data
+			myBookPhotos.forEach((photo, index) => {
+				formData.append(`book_photo_${index}`, {
+					uri: photo.uri,
+					type: "image/jpeg",
+					name: photo.name || `photo-${index}.jpg`,
+				});
+			});
+
+			// Add the count of photos for easier processing on server
+			formData.append("book_photo_count", myBookPhotos.length.toString());
+
 			// Determine the API endpoint with proper trailing slash
 			let url = editingBook
 				? `${API_BASE_URL}/books/${editingBook.id}/`
@@ -1599,25 +1646,51 @@ export default function BookFormScreen({ route, navigation }) {
 				</View>
 			</Modal>
 
-			{/* Cover Image */}
-			<TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
+			{/* Me and My Books section */}
+			<View style={styles.sectionSpacer} />
+			<Text style={styles.sectionTitle}>Me and My Books</Text>
+			<Text style={styles.photoInstructions}>
+				Upload 1-5 photos of you with this book, your reading spot, or your
+				personalized bookshelf.
+			</Text>
+
+			{/* Photos gallery */}
+			{myBookPhotos.length > 0 && (
+				<View style={styles.photoGallery}>
+					{myBookPhotos.map((photo, index) => (
+						<View key={index} style={styles.photoContainer}>
+							<Image
+								source={{ uri: photo.uri }}
+								style={styles.thumbnailImage}
+							/>
+							<TouchableOpacity
+								style={styles.removePhotoButton}
+								onPress={() => removePhoto(index)}
+							>
+								<Text style={styles.removePhotoButtonText}>×</Text>
+							</TouchableOpacity>
+						</View>
+					))}
+				</View>
+			)}
+
+			{/* Add photos button - disable if 5 photos already */}
+			<TouchableOpacity
+				onPress={pickImages}
+				style={[
+					styles.imagePicker,
+					myBookPhotos.length >= 5 && styles.disabledButton,
+				]}
+				disabled={myBookPhotos.length >= 5}
+			>
 				<Text style={styles.imagePickerText}>
-					{coverImage ? "Change Cover Image" : "Pick a Cover Image"}
+					{myBookPhotos.length === 0
+						? "Add Photos (Up to 5)"
+						: myBookPhotos.length >= 5
+						? "Maximum Photos Added"
+						: `Add More Photos (${5 - myBookPhotos.length} remaining)`}
 				</Text>
 			</TouchableOpacity>
-
-			{/* Image preview */}
-			{coverImage && (
-				<Image
-					source={{
-						uri:
-							coverImage.assets && coverImage.assets.length > 0
-								? coverImage.assets[0].uri
-								: coverImage.uri,
-					}}
-					style={styles.imagePreview}
-				/>
-			)}
 
 			{/* Submit Button */}
 			<Button
@@ -1954,6 +2027,7 @@ const styles = StyleSheet.create({
 	starText: {
 		fontSize: 24,
 	},
+
 	starFilled: {
 		color: "#FFD700",
 	},
@@ -2027,5 +2101,57 @@ const styles = StyleSheet.create({
 	},
 	favoriteButtonText: {
 		fontSize: 24,
+	},
+	// New styles for the photo gallery
+	sectionTitle: {
+		fontSize: 18,
+		fontWeight: "bold",
+		marginBottom: 8,
+		color: "#333",
+	},
+	photoInstructions: {
+		fontSize: 14,
+		color: "#666",
+		marginBottom: 12,
+		fontStyle: "italic",
+	},
+	photoGallery: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		marginBottom: 16,
+	},
+	photoContainer: {
+		width: "31%",
+		aspectRatio: 1,
+		margin: "1%",
+		position: "relative",
+	},
+	thumbnailImage: {
+		width: "100%",
+		height: "100%",
+		borderRadius: 4,
+		borderWidth: 1,
+		borderColor: "#ddd",
+	},
+	removePhotoButton: {
+		position: "absolute",
+		top: -8,
+		right: -8,
+		backgroundColor: "#ff4d4d",
+		width: 22,
+		height: 22,
+		borderRadius: 11,
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	removePhotoButtonText: {
+		color: "white",
+		fontSize: 16,
+		fontWeight: "bold",
+		lineHeight: 20,
+	},
+	disabledButton: {
+		backgroundColor: "#f0f0f0",
+		opacity: 0.7,
 	},
 });
