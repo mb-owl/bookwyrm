@@ -22,6 +22,7 @@ export default function BookListScreen({ route, navigation }) {
 	const [loading, setLoading] = useState(true);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [sortKey, setSortKey] = useState("date"); // default sort by date
+	const [showSortModal, setShowSortModal] = useState(false); // New state for sort modal
 	const { book, refresh } = route.params || {}; // book object and refresh flag passed from list
 
 	// Add a dependency on 'refresh' to trigger refetch when returning from delete
@@ -127,42 +128,278 @@ export default function BookListScreen({ route, navigation }) {
 		/>
 	);
 
+	// Enhanced sorting functions
 	const sortByTitle = () => {
 		setSortKey("title");
-		// Sort books by title ABC
 		const sorted = [...books].sort((a, b) => a.title.localeCompare(b.title));
 		setBooks(sorted);
-	};
-
-	const sortByDate = () => {
-		setSortKey("date");
-		// Sort books by date added
-		const sorted = [...books].sort(
-			(a, b) => new Date(b.dateAdded) - new Date(a.dateAdded)
-		);
-		setBooks(sorted);
+		setShowSortModal(false);
 	};
 
 	const sortByAuthor = () => {
 		setSortKey("author");
-		// Sort books by author name
 		const sorted = [...books].sort((a, b) => a.author.localeCompare(b.author));
 		setBooks(sorted);
+		setShowSortModal(false);
+	};
+
+	const sortByDate = () => {
+		setSortKey("date");
+		// Sort books by date added (created_at)
+		const sorted = [...books].sort(
+			(a, b) => new Date(b.created_at) - new Date(a.created_at)
+		);
+		setBooks(sorted);
+		setShowSortModal(false);
 	};
 
 	const sortByRating = () => {
 		setSortKey("rating");
-		// Sort books by rating
-		const sorted = [...books].sort((a, b) => b.rating - a.rating);
+		// Sort books by rating (highest first), handling null/undefined ratings
+		const sorted = [...books].sort((a, b) => {
+			const ratingA =
+				a.rating !== null && a.rating !== undefined
+					? parseFloat(a.rating)
+					: -1;
+			const ratingB =
+				b.rating !== null && b.rating !== undefined
+					? parseFloat(b.rating)
+					: -1;
+			return ratingB - ratingA;
+		});
 		setBooks(sorted);
+		setShowSortModal(false);
 	};
 
 	const sortByGenre = () => {
 		setSortKey("genre");
 		// Sort books by genre
-		const sorted = [...books].sort((a, b) => a.genre.localeCompare(b.genre));
+		const sorted = [...books].sort((a, b) => {
+			// Handle null/undefined genres
+			const genreA = a.genre || "unknown";
+			const genreB = b.genre || "unknown";
+			return genreA.localeCompare(genreB);
+		});
 		setBooks(sorted);
+		setShowSortModal(false);
 	};
+
+	// New sort functions for reading status
+	const sortByReadStatus = () => {
+		setSortKey("read");
+		// Sort books by read status (read first)
+		const sorted = [...books].sort((a, b) => {
+			// Convert boolean to number (true becomes 1, false becomes 0)
+			return (b.is_read ? 1 : 0) - (a.is_read ? 1 : 0);
+		});
+		setBooks(sorted);
+		setShowSortModal(false);
+	};
+
+	const sortByToBeReadStatus = () => {
+		setSortKey("tbr");
+		// Sort books by to-be-read status (TBR first)
+		const sorted = [...books].sort((a, b) => {
+			return (b.toBeRead ? 1 : 0) - (a.toBeRead ? 1 : 0);
+		});
+		setBooks(sorted);
+		setShowSortModal(false);
+	};
+
+	const sortByShelvedStatus = () => {
+		setSortKey("shelved");
+		// Sort books by shelved status (on shelf first)
+		const sorted = [...books].sort((a, b) => {
+			return (b.shelved ? 1 : 0) - (a.shelved ? 1 : 0);
+		});
+		setBooks(sorted);
+		setShowSortModal(false);
+	};
+
+	// Get display name for current sort option
+	const getSortDisplayName = () => {
+		switch (sortKey) {
+			case "title":
+				return "Title";
+			case "author":
+				return "Author";
+			case "date":
+				return "Date Added";
+			case "rating":
+				return "Rating";
+			case "genre":
+				return "Genre";
+			case "read":
+				return "Read Status";
+			case "tbr":
+				return "To Be Read";
+			case "shelved":
+				return "On Bookshelf";
+			default:
+				return "Date Added";
+		}
+	};
+
+	// Sort modal component
+	const renderSortModal = () => (
+		<Modal
+			visible={showSortModal}
+			transparent={true}
+			animationType="slide"
+			onRequestClose={() => setShowSortModal(false)}
+		>
+			<View style={styles.modalOverlay}>
+				<View style={styles.modalContent}>
+					<Text style={styles.modalTitle}>Sort Books By</Text>
+
+					<TouchableOpacity
+						style={[
+							styles.sortOption,
+							sortKey === "title" && styles.selectedSortOption,
+						]}
+						onPress={sortByTitle}
+					>
+						<Text
+							style={[
+								styles.sortOptionText,
+								sortKey === "title" && styles.selectedSortOptionText,
+							]}
+						>
+							Title
+						</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						style={[
+							styles.sortOption,
+							sortKey === "author" && styles.selectedSortOption,
+						]}
+						onPress={sortByAuthor}
+					>
+						<Text
+							style={[
+								styles.sortOptionText,
+								sortKey === "author" && styles.selectedSortOptionText,
+							]}
+						>
+							Author
+						</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						style={[
+							styles.sortOption,
+							sortKey === "date" && styles.selectedSortOption,
+						]}
+						onPress={sortByDate}
+					>
+						<Text
+							style={[
+								styles.sortOptionText,
+								sortKey === "date" && styles.selectedSortOptionText,
+							]}
+						>
+							Date Added
+						</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						style={[
+							styles.sortOption,
+							sortKey === "rating" && styles.selectedSortOption,
+						]}
+						onPress={sortByRating}
+					>
+						<Text
+							style={[
+								styles.sortOptionText,
+								sortKey === "rating" && styles.selectedSortOptionText,
+							]}
+						>
+							Rating
+						</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						style={[
+							styles.sortOption,
+							sortKey === "genre" && styles.selectedSortOption,
+						]}
+						onPress={sortByGenre}
+					>
+						<Text
+							style={[
+								styles.sortOptionText,
+								sortKey === "genre" && styles.selectedSortOptionText,
+							]}
+						>
+							Genre
+						</Text>
+					</TouchableOpacity>
+
+					<Text style={styles.sectionDivider}>Reading Status</Text>
+
+					<TouchableOpacity
+						style={[
+							styles.sortOption,
+							sortKey === "read" && styles.selectedSortOption,
+						]}
+						onPress={sortByReadStatus}
+					>
+						<Text
+							style={[
+								styles.sortOptionText,
+								sortKey === "read" && styles.selectedSortOptionText,
+							]}
+						>
+							Read Status
+						</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						style={[
+							styles.sortOption,
+							sortKey === "tbr" && styles.selectedSortOption,
+						]}
+						onPress={sortByToBeReadStatus}
+					>
+						<Text
+							style={[
+								styles.sortOptionText,
+								sortKey === "tbr" && styles.selectedSortOptionText,
+							]}
+						>
+							To Be Read
+						</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						style={[
+							styles.sortOption,
+							sortKey === "shelved" && styles.selectedSortOption,
+						]}
+						onPress={sortByShelvedStatus}
+					>
+						<Text
+							style={[
+								styles.sortOptionText,
+								sortKey === "shelved" && styles.selectedSortOptionText,
+							]}
+						>
+							On Bookshelf
+						</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						style={styles.closeButton}
+						onPress={() => setShowSortModal(false)}
+					>
+						<Text style={styles.closeButtonText}>Close</Text>
+					</TouchableOpacity>
+				</View>
+			</View>
+		</Modal>
+	);
 
 	const handleDelete = async () => {
 		// confirm delete book
@@ -594,6 +831,20 @@ export default function BookListScreen({ route, navigation }) {
 		);
 	};
 
+	// Replace the sort row with a button to open the sort modal
+	const renderSortButton = () => (
+		<View style={styles.sortButtonContainer}>
+			<Text style={styles.sortLabel}>Sort by:</Text>
+			<TouchableOpacity
+				style={styles.sortButton}
+				onPress={() => setShowSortModal(true)}
+			>
+				<Text style={styles.sortButtonText}>{getSortDisplayName()}</Text>
+				<Text style={styles.sortButtonIcon}>▼</Text>
+			</TouchableOpacity>
+		</View>
+	);
+
 	// Render book list or detail view based on route params
 	if (book) {
 		return renderBookDetail();
@@ -622,39 +873,8 @@ export default function BookListScreen({ route, navigation }) {
 				</TouchableOpacity>
 			</View>
 
-			<View style={styles.sortRow}>
-				<Text style={{ fontFamily: "Georgia" }}>Sort:</Text>
-				<TouchableOpacity onPress={sortByTitle}>
-					<Text
-						style={[
-							styles.sortOption,
-							sortKey === "title" ? styles.sortSelected : {},
-						]}
-					>
-						Title
-					</Text>
-				</TouchableOpacity>
-				<TouchableOpacity onPress={sortByAuthor}>
-					<Text
-						style={[
-							styles.sortOption,
-							sortKey === "author" ? styles.sortSelected : {},
-						]}
-					>
-						Author
-					</Text>
-				</TouchableOpacity>
-				<TouchableOpacity onPress={sortByDate}>
-					<Text
-						style={[
-							styles.sortOption,
-							sortKey === "date" ? styles.sortSelected : {},
-						]}
-					>
-						Date
-					</Text>
-				</TouchableOpacity>
-			</View>
+			{/* Replace old sort row with new sort button */}
+			{renderSortButton()}
 
 			{books.length === 0 ? (
 				<Text style={styles.emptyText}>No books added yet.</Text>
@@ -666,6 +886,9 @@ export default function BookListScreen({ route, navigation }) {
 					style={[styles.bookList, selectionMode && styles.selectionModeList]}
 				/>
 			)}
+
+			{/* Render sort modal */}
+			{renderSortModal()}
 
 			{/* Render bulk edit modal */}
 			{renderBulkEditModal()}
@@ -883,5 +1106,76 @@ const styles = StyleSheet.create({
 	modalButtonText: {
 		color: "#fff",
 		fontSize: 16,
+	},
+	// Updated or new styles for sorting UI
+	sortButtonContainer: {
+		flexDirection: "row",
+		alignItems: "center",
+		paddingHorizontal: 10,
+		paddingVertical: 8,
+		borderBottomWidth: 1,
+		borderBottomColor: "#e0e0e0",
+	},
+	sortLabel: {
+		fontSize: 14,
+		marginRight: 8,
+		color: "#666",
+	},
+	sortButton: {
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: "#f0f0f0",
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 4,
+	},
+	sortButtonText: {
+		fontSize: 14,
+		color: "#007BFF",
+		fontWeight: "500",
+	},
+	sortButtonIcon: {
+		fontSize: 12,
+		color: "#007BFF",
+		marginLeft: 4,
+	},
+	sortOption: {
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+		borderBottomWidth: 1,
+		borderBottomColor: "#f0f0f0",
+	},
+	selectedSortOption: {
+		backgroundColor: "rgba(0, 123, 255, 0.1)",
+	},
+	sortOptionText: {
+		fontSize: 16,
+		color: "#333",
+	},
+	selectedSortOptionText: {
+		fontWeight: "bold",
+		color: "#007BFF",
+	},
+	sectionDivider: {
+		fontSize: 14,
+		fontWeight: "bold",
+		color: "#666",
+		backgroundColor: "#f9f9f9",
+		paddingVertical: 8,
+		paddingHorizontal: 16,
+		marginTop: 8,
+	},
+	closeButton: {
+		marginTop: 16,
+		alignSelf: "center",
+		paddingVertical: 10,
+		paddingHorizontal: 20,
+		backgroundColor: "#007BFF",
+		borderRadius: 4,
+	},
+	closeButtonText: {
+		color: "#fff",
+		fontSize: 16,
+		fontWeight: "500",
 	},
 });
