@@ -80,6 +80,12 @@ export default function BookFormScreen({ route, navigation }) {
 	);
 	const [showEmojiModal, setShowEmojiModal] = useState(false);
 
+	// Add state for tags and content warnings
+	const [tags, setTags] = useState(editingBook ? editingBook.tags : "");
+	const [contentWarnings, setContentWarnings] = useState(
+		editingBook ? editingBook.content_warnings : ""
+	);
+
 	// Genre choices from models.py
 	const GENRE_CHOICES = [
 		{ label: "Fiction", value: "fiction" },
@@ -179,6 +185,14 @@ export default function BookFormScreen({ route, navigation }) {
 		}
 	}, [editingBook]);
 
+	// Add this to ensure our custom header is respected
+	useEffect(() => {
+		// This prevents the default back behavior from overriding our custom header
+		navigation.setOptions({
+			headerBackVisible: false,
+		});
+	}, [navigation]);
+
 	// Search books from OpenLibrary API
 	const searchBooks = async (query) => {
 		if (!query || query.length < 3) {
@@ -273,6 +287,274 @@ export default function BookFormScreen({ route, navigation }) {
 				setIsSearching(false);
 			}
 		}, 800);
+	};
+
+	// Function to analyze text and extract tags
+	const extractTagsFromText = (text, subjects = []) => {
+		if (!text) return [];
+
+		// Common literary themes, settings, character types, and concepts to look for
+		const themeKeywords = [
+			// Themes
+			{ word: "love", tag: "romance" },
+			{ word: "death", tag: "mortality" },
+			{ word: "war", tag: "conflict" },
+			{ word: "family", tag: "family" },
+			{ word: "friendship", tag: "friendship" },
+			{ word: "betrayal", tag: "revenge" },
+			{ word: "revenge", tag: "revenge" },
+			{ word: "journey", tag: "journey" },
+			{ word: "quest", tag: "quest" },
+			{ word: "adventure", tag: "adventure" },
+			{ word: "coming of age", tag: "coming-of-age" },
+			{ word: "identity", tag: "identity" },
+			{ word: "power", tag: "power" },
+			{ word: "struggle", tag: "struggle" },
+			{ word: "survival", tag: "survival" },
+			{ word: "rebellion", tag: "rebellion" },
+			{ word: "dystopia", tag: "dystopian" },
+			{ word: "utopia", tag: "utopian" },
+			{ word: "magic", tag: "magical" },
+
+			// Settings
+			{ word: "forest", tag: "forest" },
+			{ word: "castle", tag: "castle" },
+			{ word: "space", tag: "space" },
+			{ word: "future", tag: "futuristic" },
+			{ word: "medieval", tag: "medieval" },
+			{ word: "ancient", tag: "ancient" },
+			{ word: "modern", tag: "modern" },
+			{ word: "urban", tag: "urban" },
+			{ word: "rural", tag: "rural" },
+			{ word: "island", tag: "island" },
+			{ word: "mountain", tag: "mountains" },
+			{ word: "desert", tag: "desert" },
+			{ word: "sea", tag: "sea" },
+			{ word: "ocean", tag: "ocean" },
+			{ word: "school", tag: "school" },
+			{ word: "college", tag: "academic" },
+			{ word: "university", tag: "academic" },
+
+			// Creatures & Character Types
+			{ word: "dragon", tag: "dragons" },
+			{ word: "vampire", tag: "vampires" },
+			{ word: "werewolf", tag: "werewolves" },
+			{ word: "witch", tag: "witches" },
+			{ word: "wizard", tag: "wizards" },
+			{ word: "ghost", tag: "ghosts" },
+			{ word: "demon", tag: "demons" },
+			{ word: "angel", tag: "angels" },
+			{ word: "alien", tag: "aliens" },
+			{ word: "robot", tag: "robots" },
+			{ word: "android", tag: "androids" },
+			{ word: "warrior", tag: "warriors" },
+			{ word: "knight", tag: "knights" },
+			{ word: "princess", tag: "royalty" },
+			{ word: "prince", tag: "royalty" },
+			{ word: "king", tag: "royalty" },
+			{ word: "queen", tag: "royalty" },
+			{ word: "detective", tag: "detectives" },
+
+			// Time Periods
+			{ word: "historical", tag: "historical" },
+			{ word: "victorian", tag: "victorian" },
+			{ word: "regency", tag: "regency" },
+			{ word: "world war", tag: "world-war" },
+			{ word: "1920", tag: "1920s" },
+			{ word: "1930", tag: "1930s" },
+			{ word: "1940", tag: "1940s" },
+			{ word: "1950", tag: "1950s" },
+			{ word: "1960", tag: "1960s" },
+			{ word: "1970", tag: "1970s" },
+			{ word: "1980", tag: "1980s" },
+			{ word: "1990", tag: "1990s" },
+
+			// Story Elements
+			{ word: "mystery", tag: "mystery" },
+			{ word: "thriller", tag: "thriller" },
+			{ word: "suspense", tag: "suspense" },
+			{ word: "horror", tag: "horror" },
+			{ word: "comedy", tag: "comedy" },
+			{ word: "humorous", tag: "humor" },
+			{ word: "tragic", tag: "tragedy" },
+			{ word: "crime", tag: "crime" },
+			{ word: "murder", tag: "murder" },
+			{ word: "political", tag: "politics" },
+			{ word: "conspiracy", tag: "conspiracy" },
+			{ word: "espionage", tag: "espionage" },
+			{ word: "psychological", tag: "psychological" },
+			{ word: "philosophical", tag: "philosophical" },
+			{ word: "religion", tag: "religion" },
+			{ word: "mythology", tag: "mythology" },
+			{ word: "legend", tag: "legends" },
+
+			// LGBTQ+ related keywords
+			{ word: "gay", tag: "LGBTQ+" },
+			{ word: "lesbian", tag: "LGBTQ+" },
+			{ word: "bisexual", tag: "LGBTQ+" },
+			{ word: "transgender", tag: "LGBTQ+" },
+			{ word: "trans ", tag: "LGBTQ+" },
+			{ word: "queer", tag: "LGBTQ+" },
+			{ word: "non-binary", tag: "LGBTQ+" },
+			{ word: "nonbinary", tag: "LGBTQ+" },
+			{ word: "genderfluid", tag: "LGBTQ+" },
+			{ word: "same-sex", tag: "LGBTQ+" },
+			{ word: "lgbt", tag: "LGBTQ+" },
+		];
+
+		// Initialize tags array
+		let tags = [];
+
+		// Add tags from subject categories if available
+		if (subjects && subjects.length > 0) {
+			// Common subject categories that make good tags
+			const goodSubjectTags = [
+				"fiction",
+				"non-fiction",
+				"fantasy",
+				"science fiction",
+				"mystery",
+				"romance",
+				"thriller",
+				"horror",
+				"adventure",
+				"historical",
+				"biography",
+				"young adult",
+				"children",
+				"dystopian",
+				"utopian",
+				"supernatural",
+				"paranormal",
+			];
+
+			subjects.forEach((subject) => {
+				const lowerSubject = subject.toLowerCase();
+
+				// Check if the subject is a good tag candidate
+				for (const goodTag of goodSubjectTags) {
+					if (lowerSubject.includes(goodTag)) {
+						// Format multi-word tags with hyphens
+						tags.push(goodTag.replace(/\s+/g, "-"));
+						break;
+					}
+				}
+			});
+		}
+
+		// Look for theme keywords in the text
+		const lowerText = text.toLowerCase();
+		themeKeywords.forEach(({ word, tag }) => {
+			if (lowerText.includes(word)) {
+				tags.push(tag);
+			}
+		});
+
+		// Remove duplicates
+		tags = [...new Set(tags)];
+
+		// Limit to top 5 tags maximum
+		return tags.slice(0, 5);
+	};
+
+	// Function to detect content warnings from text
+	const extractContentWarnings = (text, subjects = []) => {
+		if (!text) return [];
+
+		// Common content warning categories
+		const contentWarningKeywords = [
+			// Violence
+			{ word: "violence", warning: "violence" },
+			{ word: "violent", warning: "violence" },
+			{ word: "gore", warning: "graphic violence" },
+			{ word: "blood", warning: "blood" },
+			{ word: "murder", warning: "murder" },
+			{ word: "war", warning: "war" },
+			{ word: "torture", warning: "torture" },
+
+			// Abuse
+			{ word: "abuse", warning: "abuse" },
+			{ word: "domestic abuse", warning: "domestic abuse" },
+			{ word: "child abuse", warning: "child abuse" },
+			{ word: "sexual abuse", warning: "sexual abuse" },
+			{ word: "assault", warning: "assault" },
+
+			// Sexual content
+			{ word: "sexual content", warning: "sexual content" },
+			{ word: "sexual assault", warning: "sexual assault" },
+			{ word: "rape", warning: "sexual assault" },
+
+			// Self-harm and suicide
+			{ word: "suicide", warning: "suicide" },
+			{ word: "self-harm", warning: "self-harm" },
+			{ word: "self harm", warning: "self-harm" },
+
+			// Mental health
+			{ word: "depression", warning: "depression" },
+			{ word: "anxiety", warning: "anxiety" },
+			{ word: "eating disorder", warning: "eating disorders" },
+			{ word: "addiction", warning: "addiction" },
+
+			// Phobias and triggers
+			{ word: "phobia", warning: "phobias" },
+			{ word: "arachnophobia", warning: "spiders" },
+			{ word: "claustrophobia", warning: "confined spaces" },
+
+			// Discrimination
+			{ word: "racism", warning: "racism" },
+			{ word: "homophobia", warning: "homophobia" },
+			{ word: "transphobia", warning: "transphobia" },
+			{ word: "sexism", warning: "sexism" },
+			{ word: "antisemitism", warning: "antisemitism" },
+			{ word: "islamophobia", warning: "islamophobia" },
+
+			// Death and grief
+			{ word: "death", warning: "death" },
+			{ word: "grief", warning: "grief" },
+			{ word: "terminal illness", warning: "terminal illness" },
+			{ word: "cancer", warning: "cancer" },
+
+			// Others
+			{ word: "drug", warning: "drug use" },
+			{ word: "alcohol", warning: "alcohol abuse" },
+			{ word: "alcoholism", warning: "alcohol abuse" },
+			{ word: "animal cruelty", warning: "animal cruelty" },
+			{ word: "animal death", warning: "animal death" },
+			{ word: "incest", warning: "incest" },
+			{ word: "abortion", warning: "abortion" },
+			{ word: "miscarriage", warning: "pregnancy loss" },
+			{ word: "stillbirth", warning: "pregnancy loss" },
+		];
+
+		// Initialize warnings array
+		let warnings = [];
+
+		// Add warnings from subject categories if available
+		if (subjects && subjects.length > 0) {
+			subjects.forEach((subject) => {
+				const lowerSubject = subject.toLowerCase();
+				contentWarningKeywords.forEach(({ word, warning }) => {
+					if (lowerSubject.includes(word)) {
+						warnings.push(warning);
+					}
+				});
+			});
+		}
+
+		// Look for warning keywords in the text
+		const lowerText = text.toLowerCase();
+		contentWarningKeywords.forEach(({ word, warning }) => {
+			if (lowerText.includes(word)) {
+				warnings.push(warning);
+			}
+		});
+
+		// Remove duplicates and capitalize first letter of each warning
+		warnings = [...new Set(warnings)].map(
+			(warning) => warning.charAt(0).toUpperCase() + warning.slice(1)
+		);
+
+		return warnings;
 	};
 
 	// Handle selection of a book from search results
@@ -414,6 +696,22 @@ export default function BookFormScreen({ route, navigation }) {
 		// Set the vibes text (including both metadata and synopsis if available)
 		setVibes(vibesText);
 
+		// Generate tags automatically based on book description and subjects
+		const generatedTags = extractTagsFromText(vibesText, book.subject);
+		console.log("Generated tags:", generatedTags);
+
+		// Store the generated tags
+		const tagsString = generatedTags.join(", ");
+		setTags(tagsString);
+
+		// Generate content warnings based on book description and subjects
+		const generatedWarnings = extractContentWarnings(vibesText, book.subject);
+		console.log("Generated content warnings:", generatedWarnings);
+
+		// Store the generated content warnings
+		const warningsString = generatedWarnings.join(", ");
+		setContentWarnings(warningsString);
+
 		// Map subjects to genres if possible
 		if (book.subject && book.subject.length > 0) {
 			const matchedGenres = book.subject
@@ -430,13 +728,8 @@ export default function BookFormScreen({ route, navigation }) {
 			}
 		}
 
-		// Set cover image if available
-		if (book.coverId) {
-			setCoverImage({
-				uri: `${COVER_API_BASE}${book.coverId}-L.jpg`,
-				isFromApi: true,
-			});
-		}
+		// SIMPLIFIED: No longer setting cover image from API results
+		// This forces users to select their own images
 
 		// Hide search results
 		setShowSearchResults(false);
@@ -628,7 +921,7 @@ export default function BookFormScreen({ route, navigation }) {
 		}
 	};
 
-	// UPDATED: Handle the form submission with improved error handling and debugging
+	// SIMPLIFIED: Handle the form submission with clearer image handling
 	const handleSubmit = async () => {
 		if (!title || !author) {
 			Alert.alert("Title and author are required fields.");
@@ -639,177 +932,113 @@ export default function BookFormScreen({ route, navigation }) {
 		try {
 			console.log("Creating form data...");
 			let formData = new FormData();
+
+			// Add all the basic book information
 			formData.append("title", title);
 			formData.append("author", author);
+			formData.append(
+				"genre",
+				genres && genres.length > 0 ? genres[0] : "unknown"
+			);
+			formData.append("isbn", "");
 
-			// Simplified genre handling - just send a single valid genre string
-			// Django model expects a single value from choices, not a comma-separated list
-			try {
-				// Get the first valid genre or use "unknown"
-				const genreValue = genres && genres.length > 0 ? genres[0] : "unknown";
-				formData.append("genre", genreValue);
-				console.log("Genre value being sent:", genreValue);
-			} catch (genreError) {
-				console.error("Error processing genres:", genreError);
-				formData.append("genre", "unknown");
+			// Format the book notes
+			let combinedNotes = "";
+			if (vibes && thoughts) {
+				combinedNotes = `${vibes}--VIBES_SEPARATOR--${thoughts}`;
+			} else if (vibes) {
+				combinedNotes = vibes;
+			} else {
+				combinedNotes = thoughts || "";
 			}
-
-			// Combine vibes and thoughts into book_notes with a separator
-			const combinedNotes = vibes
-				? `${vibes}--VIBES_SEPARATOR--${thoughts}`
-				: thoughts;
-
 			formData.append("book_notes", combinedNotes);
 
-			// Format rating properly - server might be strict about decimal format
-			const numericRating = parseFloat(rating) || 0;
-			formData.append("rating", numericRating.toFixed(2));
-			console.log("Rating value being sent:", numericRating.toFixed(2));
+			// Add numeric values
+			formData.append("rating", (parseFloat(rating) || 0).toFixed(2));
 
-			// Boolean fields - make sure format matches what Django expects
+			// Add boolean values
 			formData.append("is_read", isRead ? "true" : "false");
 			formData.append("toBeRead", toBeRead ? "true" : "false");
 			formData.append("shelved", shelved ? "true" : "false");
 
-			// Create a proper date string for Django DateField (YYYY-MM-DD)
+			// Add date
 			const dateObj = new Date(publicationYear, 0, 1);
 			const formattedDate = dateObj.toISOString().split("T")[0];
 			formData.append("publication_date", formattedDate);
-			console.log("Publication date being sent:", formattedDate);
 
-			// IMPROVED: Better cover image handling for server compatibility
-			if (coverImage) {
-				console.log("Processing cover image...");
+			// Add tags and warnings
+			formData.append("tags", tags ? tags.substring(0, 255) : "");
+			formData.append("content_warnings", contentWarnings || "");
+			formData.append("emoji", emoji || "📚");
+
+			// SIMPLIFIED: Handle cover image - only for user uploads
+			if (coverImage && !coverImage.canceled) {
 				let uri;
 
-				// Handle API cover images
-				if (coverImage.isFromApi) {
-					// For API images, we'll need to download and then upload them
-					console.log("Cover is from API, skipping for now");
-					// Skip sending API images as they might cause server errors
+				// Handle image picker result format
+				if (coverImage.assets && coverImage.assets.length > 0) {
+					uri = coverImage.assets[0].uri;
+				} else if (coverImage.uri) {
+					uri = coverImage.uri;
 				}
-				// Handle local image picker results
-				else if (!coverImage.canceled) {
-					// Check if image is in the new format with assets array
-					if (coverImage.assets && coverImage.assets.length > 0) {
-						uri = coverImage.assets[0].uri;
-					}
-					// Fall back to old format if needed
-					else if (coverImage.uri) {
-						uri = coverImage.uri;
-					}
 
-					if (uri) {
-						const fileName = uri.split("/").pop() || "cover.jpg";
-						const match = /\.(\w+)$/.exec(fileName);
-						const fileType = match ? `image/${match[1]}` : "image/jpeg";
+				if (uri) {
+					const fileName = uri.split("/").pop() || "cover.jpg";
+					const match = /\.(\w+)$/.exec(fileName);
+					const fileType = match ? `image/${match[1]}` : "image/jpeg";
 
-						console.log("Adding cover to form data:", {
-							uri,
-							name: fileName,
-							type: fileType,
-						});
-
-						try {
-							// Use 'cover' field name to match Django model
-							formData.append("cover", {
-								uri: uri,
-								name: fileName,
-								type: fileType,
-							});
-						} catch (imageError) {
-							console.error("Error appending image to form data:", imageError);
-						}
-					}
-				} else {
-					console.log("No cover image to upload");
+					formData.append("cover", {
+						uri,
+						name: fileName,
+						type: fileType,
+					});
+					console.log(`Adding image: ${fileName}`);
 				}
 			}
 
-			// Use API_BASE_URL for consistent API access
+			// Determine the API endpoint
 			const url = editingBook
-				? `${API_BASE_URL}/books/${editingBook.id}/` // update existing book
-				: `${API_BASE_URL}/books/`; // create new book
+				? `${API_BASE_URL}/books/${editingBook.id}/`
+				: `${API_BASE_URL}/books/`;
 
 			const method = editingBook ? "PUT" : "POST";
+			console.log(`Submitting to ${method} ${url}`);
 
-			console.log("Submitting to URL:", url, "Method:", method);
-			console.log("Form data keys:", Object.fromEntries(formData._parts || []));
+			// Submit the form
+			const response = await fetch(url, {
+				method: method,
+				body: formData,
+				headers: {
+					Accept: "application/json",
+				},
+			});
 
-			// IMPROVED: Try to diagnose 500 error with better logging
-			let response;
-			try {
-				// First try without the image to see if that's causing the issue
-				const formDataWithoutImage = new FormData();
-				formData._parts.forEach((part) => {
-					if (part[0] !== "cover") {
-						formDataWithoutImage.append(part[0], part[1]);
-					}
-				});
-
-				// Only include basic fields for diagnosis
-				response = await fetch(url, {
-					method: method,
-					body: formData,
-					headers: {
-						Accept: "application/json",
-					},
-				});
-
-				console.log("Response status:", response.status);
-			} catch (fetchError) {
-				console.error("Network error during fetch:", fetchError);
-				throw new Error(`Network error: ${fetchError.message}`);
-			}
-
-			if (!response.ok) {
-				let errText = "";
+			if (response.ok) {
+				const data = await response.json();
+				console.log("Book saved successfully:", data);
+				Alert.alert("Success", "Book saved successfully!");
+				navigation.navigate("BookListScreen", { refresh: Date.now() });
+			} else {
+				// Handle error response
+				let errorText = "";
 				try {
-					const errJson = await response.json();
-					errText = JSON.stringify(errJson);
-					console.error("Server JSON error:", errJson);
-				} catch (jsonError) {
+					const errorData = await response.json();
+					errorText = JSON.stringify(errorData);
+				} catch (e) {
 					try {
-						errText = await response.text();
-						console.error("Server text error:", errText);
-					} catch (textError) {
-						errText = "Could not read error response";
+						errorText = await response.text();
+					} catch (e2) {
+						errorText = "Unknown error";
 					}
 				}
-				throw new Error(`Server error (${response.status}): ${errText}`);
+				throw new Error(`Server error (${response.status}): ${errorText}`);
 			}
-
-			Alert.alert("Success", "Book saved successfully!");
-			// Navigate back with refresh parameter
-			navigation.navigate("BookListScreen", { refresh: Date.now() });
 		} catch (error) {
 			console.error("Error saving book:", error);
-
-			// IMPROVED: More specific error message for 500 errors
-			if (error.message.includes("500")) {
-				Alert.alert(
-					"Server Error",
-					"The server encountered an internal error. This might be because:\n\n" +
-						"1. There may be an issue with the data format\n" +
-						"2. The server might have validation rules we're not meeting\n" +
-						"3. There could be a problem with the image upload\n\n" +
-						"Try submitting without an image or with different field values.\n\n" +
-						"Error details: " +
-						error.message
-				);
-			} else {
-				Alert.alert(
-					"Network Error",
-					"Failed to connect to the server. Please check:\n\n" +
-						"1. Your server is running at " +
-						API_BASE_URL +
-						"\n" +
-						"2. You're connected to the same network\n" +
-						"3. If using a real device, make sure it can reach your computer\n\n" +
-						"Error details: " +
-						error.message
-				);
-			}
+			Alert.alert(
+				"Error Saving Book",
+				`There was a problem saving the book: ${error.message}`
+			);
 		} finally {
 			setUploading(false);
 		}
@@ -947,6 +1176,24 @@ export default function BookFormScreen({ route, navigation }) {
 			</Modal>
 
 			<View style={styles.sectionSpacer} />
+
+			{/* Tags field (auto-generated) */}
+			<Text style={styles.label}>Tags (Auto-Generated):</Text>
+			<TextInput
+				style={styles.input}
+				value={tags}
+				onChangeText={setTags}
+				placeholder="Comma-separated tags"
+			/>
+
+			{/* Content Warnings field (auto-generated) */}
+			<Text style={styles.label}>Content Warnings:</Text>
+			<TextInput
+				style={styles.input}
+				value={contentWarnings}
+				onChangeText={setContentWarnings}
+				placeholder="Comma-separated content warnings"
+			/>
 
 			{/* Vibes/Description field */}
 			<Text style={[styles.label, { color: "#007BFF" }]}>Vibes:</Text>
@@ -1228,11 +1475,10 @@ export default function BookFormScreen({ route, navigation }) {
 			{coverImage && (
 				<Image
 					source={{
-						uri: coverImage.isFromApi
-							? coverImage.uri
-							: coverImage.assets && coverImage.assets.length > 0
-							? coverImage.assets[0].uri
-							: coverImage.uri,
+						uri:
+							coverImage.assets && coverImage.assets.length > 0
+								? coverImage.assets[0].uri
+								: coverImage.uri,
 					}}
 					style={styles.imagePreview}
 				/>
@@ -1489,12 +1735,11 @@ const styles = StyleSheet.create({
 		fontSize: 18,
 		fontWeight: "bold",
 		marginBottom: 15,
-		textAlign: "center",
 	},
 	genreItem: {
-		paddingVertical: 12,
+		padding: 12,
 		borderBottomWidth: 1,
-		borderBottomColor: "#f0f0f0",
+		borderBottomColor: "#eee",
 	},
 	genreItemRow: {
 		flexDirection: "row",
@@ -1505,162 +1750,133 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 	},
 	checkbox: {
-		height: 20,
 		width: 20,
-		borderRadius: 4,
+		height: 20,
 		borderWidth: 1,
 		borderColor: "#007BFF",
+		borderRadius: 4,
 		justifyContent: "center",
 		alignItems: "center",
 	},
 	checkboxSelected: {
-		height: 12,
-		width: 12,
+		width: 14,
+		height: 14,
 		backgroundColor: "#007BFF",
-		borderRadius: 2,
+		borderRadius: 3,
 	},
 	modalButtonRow: {
 		flexDirection: "row",
-		justifyContent: "center",
-		marginTop: 20,
+		justifyContent: "flex-end",
+		marginTop: 10,
 	},
 	modalButton: {
+		backgroundColor: "#007BFF",
 		paddingVertical: 10,
-		paddingHorizontal: 20,
-		borderRadius: 5,
-		minWidth: 100,
-		alignItems: "center",
+		paddingHorizontal: 15,
+		borderRadius: 4,
 	},
 	cancelButton: {
-		backgroundColor: "#007BFF",
+		backgroundColor: "#f44336",
+		marginLeft: 10,
 	},
 	modalButtonText: {
 		color: "#fff",
-		fontSize: 16,
+		fontWeight: "500",
 	},
 	ratingContainer: {
-		marginBottom: 24,
+		backgroundColor: "#f9f9f9",
+		padding: 15,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: "#ddd",
+		marginBottom: 20,
 	},
 	ratingInputRow: {
 		flexDirection: "row",
 		alignItems: "center",
-		justifyContent: "center",
-		marginBottom: 12,
-	},
-	ratingInput: {
-		width: "30%",
-		textAlign: "center",
-		marginBottom: 0,
-		marginHorizontal: 10,
+		justifyContent: "space-between",
+		marginBottom: 10,
 	},
 	ratingButton: {
 		backgroundColor: "#007BFF",
-		width: 36,
-		height: 36,
-		borderRadius: 18,
-		justifyContent: "center",
+		padding: 10,
+		borderRadius: 4,
+		width: 40,
 		alignItems: "center",
 	},
 	ratingButtonText: {
-		color: "white",
-		fontSize: 20,
-		fontWeight: "bold",
+		color: "#fff",
+		fontWeight: "500",
 	},
 	ratingScale: {
 		flexDirection: "row",
-		justifyContent: "center",
-		width: "100%",
-		marginTop: 8,
+		justifyContent: "space-between",
+		marginBottom: 10,
 	},
 	starButton: {
-		padding: 5,
-		width: 48,
-		alignItems: "center",
+		padding: 0,
 	},
 	starText: {
-		fontSize: 30,
+		fontSize: 24,
 	},
-	starEmpty: {
-		color: "#CCCCCC",
+	starFilled: {
+		color: "#FFD700",
 	},
 	starQuarter: {
-		color: "#FFE066",
+		color: "#FFD700",
 	},
 	starHalf: {
 		color: "#FFD700",
 	},
 	starThreeQuarter: {
-		color: "#FFBF00",
+		color: "#FFD700",
 	},
-	starFilled: {
-		color: "#FFA500", // orange color for filled stars
+	starEmpty: {
+		color: "#ddd",
 	},
 	ratingHelp: {
-		textAlign: "center",
 		fontSize: 12,
-		color: "#777",
-		marginTop: 8,
+		color: "#666",
+		textAlign: "center",
 	},
 	emojiButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: "#f0f0f0",
-		padding: 12,
+		backgroundColor: "#007BFF",
+		padding: 10,
 		borderRadius: 4,
-		borderWidth: 1,
-		borderColor: "#ccc",
-		marginBottom: 16,
+		alignItems: "center",
+		marginBottom: 20,
 	},
 	emojiDisplay: {
-		fontSize: 30,
-		marginRight: 10,
-	},
-	emojiButtonText: {
-		color: "#007BFF",
+		fontSize: 32,
 	},
 	emojiOption: {
-		width: "25%",
-		padding: 10,
+		flex: 1,
 		alignItems: "center",
+		padding: 10,
 	},
 	emojiText: {
 		fontSize: 28,
-		marginBottom: 4,
 	},
 	emojiDescription: {
-		fontSize: 10,
-		textAlign: "center",
-		color: "#666",
-	},
-	yearItem: {
-		paddingVertical: 12,
-		paddingHorizontal: 20,
-		borderBottomWidth: 1,
-		borderBottomColor: "#f0f0f0",
-	},
-	yearText: {
-		fontSize: 16,
-		textAlign: "center",
-	},
-	selectedYearText: {
-		fontWeight: "bold",
-		color: "#007BFF",
-	},
-	debugContainer: {
-		marginTop: 20,
-		padding: 10,
-		backgroundColor: "#f0f0f0",
-		borderRadius: 5,
-		borderWidth: 1,
-		borderColor: "#ddd",
-	},
-	debugTitle: {
-		fontWeight: "bold",
-		marginBottom: 5,
-	},
-	debugText: {
 		fontSize: 12,
 		color: "#666",
-		marginBottom: 3,
+		textAlign: "center",
+	},
+	debugContainer: {
+		backgroundColor: "#f0f0f0",
+		padding: 15,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: "#ddd",
+		marginTop: 20,
+	},
+	debugTitle: {
+		fontSize: 16,
+		fontWeight: "500",
+		marginBottom: 10,
+	},
+	debugText: {
+		fontSize: 14,
+		color: "#333",
 	},
 });

@@ -1,12 +1,17 @@
 import { Platform } from "react-native";
 
 // Define a simple configuration for the API URL
-// Using a fixed localhost URL (127.0.0.1) for both simulator and device
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+// Updated to work with both simulator and physical device
+const API_BASE_URL =
+	Platform.OS === "ios"
+		? "http://localhost:8000/api"
+		: "http://10.0.2.2:8000/api"; // Android emulator uses 10.0.2.2 to access host
 
 // Helper function to get media URL
 const getMediaUrl = () => {
-	return "http://127.0.0.1:8000/media/";
+	return Platform.OS === "ios"
+		? "http://localhost:8000/media/"
+		: "http://10.0.2.2:8000/media/";
 };
 
 // Export the configuration

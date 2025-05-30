@@ -46,6 +46,7 @@ class Book(models.Model):
     page_count = models.PositiveIntegerField(blank=True, null=True)  # number of pages in the book, optional
     vibes = models.CharField(max_length=255, blank=True, null=True)  # vibes of the book, optional
     tags = models.CharField(max_length=255, blank=True, null=True)  # tags associated with the book, optional
+    content_warnings = models.TextField(blank=True, null=True)  # content warnings for sensitive topics
 
     def __str__(self):
         return f'{self.title} by {self.author}'

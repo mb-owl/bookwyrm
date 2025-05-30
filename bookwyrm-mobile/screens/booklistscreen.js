@@ -31,6 +31,14 @@ export default function BookListScreen({ route, navigation }) {
 		fetchBooks();
 	}, [refresh]); // This will re-run when the refresh parameter changes
 
+	// Add this to ensure our custom header is respected
+	useEffect(() => {
+		// Since this is typically the first screen, we might not need a back button at all
+		navigation.setOptions({
+			headerLeft: () => null,
+		});
+	}, [navigation]);
+
 	const fetchBooks = async () => {
 		try {
 			setLoading(true);
@@ -158,13 +166,9 @@ export default function BookListScreen({ route, navigation }) {
 		// Sort books by rating (highest first), handling null/undefined ratings
 		const sorted = [...books].sort((a, b) => {
 			const ratingA =
-				a.rating !== null && a.rating !== undefined
-					? parseFloat(a.rating)
-					: -1;
+				a.rating !== null && a.rating !== undefined ? parseFloat(a.rating) : -1;
 			const ratingB =
-				b.rating !== null && b.rating !== undefined
-					? parseFloat(b.rating)
-					: -1;
+				b.rating !== null && b.rating !== undefined ? parseFloat(b.rating) : -1;
 			return ratingB - ratingA;
 		});
 		setBooks(sorted);
@@ -450,13 +454,8 @@ export default function BookListScreen({ route, navigation }) {
 
 						Alert.alert("Success", "Book deleted successfully");
 
-						// Reset navigation to book list with refresh
-						navigation.reset({
-							index: 0,
-							routes: [
-								{ name: "BookListScreen", params: { refresh: Date.now() } },
-							],
-						});
+						// Modified navigation - go directly to BookListScreen with refresh
+						navigation.navigate("BookListScreen", { refresh: Date.now() });
 					} catch (error) {
 						console.error("Error deleting book:", error);
 						Alert.alert(

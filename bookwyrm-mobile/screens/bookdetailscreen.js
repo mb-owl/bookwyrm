@@ -8,6 +8,7 @@ import {
 	Alert,
 	ScrollView,
 	ActivityIndicator,
+	Animated,
 } from "react-native";
 
 // Import API configuration
@@ -18,6 +19,10 @@ export default function BookDetailScreen({ route, navigation }) {
 	const [book, setBook] = useState(initialBook || null);
 	const [loading, setLoading] = useState(!initialBook && bookId);
 	const [error, setError] = useState(null);
+
+	// Add state to track if deeper details are visible
+	const [showDeeperDetails, setShowDeeperDetails] = useState(false);
+	const [detailsAnimation] = useState(new Animated.Value(0));
 
 	// Fetch book details if we only have the ID
 	useEffect(() => {
@@ -32,6 +37,14 @@ export default function BookDetailScreen({ route, navigation }) {
 			console.log("Book data:", JSON.stringify(book, null, 2));
 		}
 	}, [book]);
+
+	// Add this to ensure our custom header is respected
+	useEffect(() => {
+		// This prevents the default back behavior from overriding our custom header
+		navigation.setOptions({
+			headerBackVisible: false,
+		});
+	}, [navigation]);
 
 	// Fetch book details from the API
 	const fetchBookDetails = async () => {
@@ -51,6 +64,19 @@ export default function BookDetailScreen({ route, navigation }) {
 		} finally {
 			setLoading(false);
 		}
+	};
+
+	// Toggle deeper details visibility with animation
+	const toggleDeeperDetails = () => {
+		const toValue = showDeeperDetails ? 0 : 1;
+
+		Animated.timing(detailsAnimation, {
+			toValue,
+			duration: 300,
+			useNativeDriver: false,
+		}).start();
+
+		setShowDeeperDetails(!showDeeperDetails);
 	};
 
 	// Extract vibes and thoughts from book_notes if the separator exists
@@ -213,19 +239,30 @@ export default function BookDetailScreen({ route, navigation }) {
 			<View style={styles.titleContainer}>
 				<Text style={styles.bookTitle}>{book.title}</Text>
 				<Text style={styles.bookAuthor}>by {book.author}</Text>
+
+				{/* Low profile action buttons - now below author name */}
+				<View style={styles.actionButtonsContainer}>
+					<TouchableOpacity style={styles.actionButton} onPress={handleEdit}>
+						<Text style={styles.actionButtonText}>Edit</Text>
+					</TouchableOpacity>
+					<TouchableOpacity style={styles.actionButton} onPress={handleDelete}>
+						<Text style={styles.actionButtonText}>Delete</Text>
+					</TouchableOpacity>
+				</View>
 			</View>
 
-			{/* Basic Information Section */}
+			{/* Primary Details Section */}
 			<View style={styles.sectionContainer}>
-				<Text style={styles.sectionTitle}>Basic Information</Text>
+				<Text style={styles.sectionTitle}>Book Details</Text>
 				<View style={styles.sectionDivider} />
 
 				{renderField("Genre", book.genre)}
-				{renderField("Publication Date", book.publication_date, formatDate)}
-				{renderField("ISBN", book.isbn)}
-				{renderField("Publisher", book.publisher)}
-				{renderField("Language", book.language)}
-				{renderField("Page Count", book.page_count)}
+				{renderField(
+					"Publication Year",
+					book.publication_date
+						? new Date(book.publication_date).getFullYear()
+						: null
+				)}
 			</View>
 
 			{/* Reading Status Section */}
@@ -233,63 +270,165 @@ export default function BookDetailScreen({ route, navigation }) {
 				<Text style={styles.sectionTitle}>Reading Status</Text>
 				<View style={styles.sectionDivider} />
 
-				{renderBooleanField("Already Read", book.is_read)}
-				{renderBooleanField("To Be Read", book.toBeRead)}
-				{renderBooleanField("On Bookshelf", book.shelved)}
+				<View style={styles.statusContainer}>
+					<View
+						style={[
+							styles.statusBadge,
+							book.is_read && styles.activeStatusBadge,
+						]}
+					>
+						<Text
+							style={[
+								styles.statusText,
+								book.is_read && styles.activeStatusText,
+							]}
+						>
+							{book.is_read ? "Read" : "Unread"}
+						</Text>
+					</View>
+
+					<View
+						style={[
+							styles.statusBadge,
+							book.toBeRead && styles.activeStatusBadge,
+						]}
+					>
+						<Text
+							style={[
+								styles.statusText,
+								book.toBeRead && styles.activeStatusText,
+							]}
+						>
+							{book.toBeRead ? "To Be Read" : "Not on TBR"}
+						</Text>
+					</View>
+
+					<View
+						style={[
+							styles.statusBadge,
+							book.shelved && styles.activeStatusBadge,
+						]}
+					>
+						<Text
+							style={[
+								styles.statusText,
+								book.shelved && styles.activeStatusText,
+							]}
+						>
+							{book.shelved ? "On Shelf" : "Not on Shelf"}
+						</Text>
+					</View>
+				</View>
 			</View>
 
-			{/* Rating and Impressions Section */}
-			<View style={styles.sectionContainer}>
-				<Text style={styles.sectionTitle}>Rating & Impressions</Text>
-				<View style={styles.sectionDivider} />
+			{/* Conditional Rating Section - only if book is read */}
+			{book.is_read && (
+				<View style={styles.sectionContainer}>
+					<Text style={styles.sectionTitle}>Rating & Impressions</Text>
+					<View style={styles.sectionDivider} />
 
-				{renderRatingField("Rating", book.rating)}
-				{renderField("Emoji", book.emoji || "📚")}
-			</View>
+					{renderRatingField("Rating", book.rating)}
+					{renderField("Emoji", book.emoji || "📚")}
+				</View>
+			)}
 
-			{/* Content Section */}
-			<View style={styles.sectionContainer}>
-				<Text style={styles.sectionTitle}>Content</Text>
-				<View style={styles.sectionDivider} />
+			{/* Content Section - always display if there's content */}
+			{(vibes || thoughts) && (
+				<View style={styles.sectionContainer}>
+					<Text style={styles.sectionTitle}>Content</Text>
+					<View style={styles.sectionDivider} />
 
-				{renderField("Vibes", vibes)}
-				{renderField("My Thoughts", thoughts)}
-			</View>
+					{vibes && (
+						<View style={styles.fieldContainer}>
+							<Text style={styles.fieldLabel}>Vibes:</Text>
+							<Text style={styles.fieldValue}>{vibes}</Text>
+						</View>
+					)}
 
-			{/* Tags Section */}
-			<View style={styles.sectionContainer}>
-				<Text style={styles.sectionTitle}>Tags & Categories</Text>
-				<View style={styles.sectionDivider} />
+					{thoughts && (
+						<View style={styles.fieldContainer}>
+							<Text style={styles.fieldLabel}>My Thoughts:</Text>
+							<Text style={styles.fieldValue}>{thoughts}</Text>
+						</View>
+					)}
+				</View>
+			)}
 
-				{renderField("Tags", book.tags)}
-				{renderField("Vibes Tags", book.vibes)}
-			</View>
+			{/* Deeper Look button */}
+			<TouchableOpacity
+				style={styles.deeperLookButton}
+				onPress={toggleDeeperDetails}
+			>
+				<Text style={styles.deeperLookButtonText}>
+					{showDeeperDetails
+						? "Hide Detailed Information"
+						: "Take a Deeper Look"}
+				</Text>
+				<Text style={styles.deeperLookIcon}>
+					{showDeeperDetails ? "▲" : "▼"}
+				</Text>
+			</TouchableOpacity>
 
-			{/* System Information Section */}
-			<View style={styles.sectionContainer}>
-				<Text style={styles.sectionTitle}>System Information</Text>
-				<View style={styles.sectionDivider} />
+			{/* Collapsible "Deeper Look" sections */}
+			<Animated.View
+				style={[
+					styles.deeperDetailsContainer,
+					{
+						maxHeight: detailsAnimation.interpolate({
+							inputRange: [0, 1],
+							outputRange: [0, 1000], // Large enough to show all content
+						}),
+						opacity: detailsAnimation,
+					},
+				]}
+			>
+				{/* Publication Details Section */}
+				<View style={styles.deeperSectionContainer}>
+					<Text style={styles.deeperSectionTitle}>Publication Details</Text>
+					<View style={styles.sectionDivider} />
 
-				{renderField("Created", book.created_at, formatDate)}
-				{renderField("Last Updated", book.updated_at, formatDate)}
-				{renderField("ID", book.id)}
-			</View>
+					{renderField("Publisher", book.publisher)}
+					{renderField("ISBN", book.isbn)}
+					{renderField("Language", book.language)}
+					{renderField("Page Count", book.page_count)}
+				</View>
 
-			{/* Action Buttons */}
-			<View style={styles.buttonContainer}>
-				<TouchableOpacity
-					style={[styles.button, styles.editButton]}
-					onPress={handleEdit}
-				>
-					<Text style={styles.buttonText}>Edit</Text>
-				</TouchableOpacity>
-				<TouchableOpacity
-					style={[styles.button, styles.deleteButton]}
-					onPress={handleDelete}
-				>
-					<Text style={styles.buttonText}>Delete</Text>
-				</TouchableOpacity>
-			</View>
+				{/* Tags Section */}
+				<View style={styles.deeperSectionContainer}>
+					<Text style={styles.deeperSectionTitle}>Tags & Categories</Text>
+					<View style={styles.sectionDivider} />
+
+					{renderField("Tags", book.tags)}
+				</View>
+
+				{/* System Information Section */}
+				<View style={styles.deeperSectionContainer}>
+					<Text style={styles.deeperSectionTitle}>System Information</Text>
+					<View style={styles.sectionDivider} />
+
+					{renderField("Created", book.created_at, formatDate)}
+					{renderField("Last Updated", book.updated_at, formatDate)}
+					{renderField("ID", book.id)}
+				</View>
+
+				{/* Content Warnings Section - if present */}
+				{book.content_warnings && (
+					<View style={styles.deeperSectionContainer}>
+						<Text style={[styles.deeperSectionTitle, styles.warningTitle]}>
+							Content Warnings
+						</Text>
+						<View style={styles.sectionDivider} />
+
+						<View style={styles.warningContainer}>
+							{book.content_warnings.split(",").map((warning, index) => (
+								<View key={index} style={styles.warningBadge}>
+									<Text style={styles.warningText}>{warning.trim()}</Text>
+								</View>
+							))}
+						</View>
+					</View>
+				)}
+			</Animated.View>
 
 			{/* Bottom spacer */}
 			<View style={styles.bottomSpacer} />
@@ -355,6 +494,10 @@ const styles = StyleSheet.create({
 		width: 200,
 		height: 300,
 		borderRadius: 10,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.2,
+		shadowRadius: 3,
 	},
 	noCoverContainer: {
 		width: 200,
@@ -373,7 +516,7 @@ const styles = StyleSheet.create({
 	},
 	titleContainer: {
 		alignItems: "center",
-		marginBottom: 20,
+		marginBottom: 24,
 		paddingHorizontal: 20,
 	},
 	bookTitle: {
@@ -387,6 +530,20 @@ const styles = StyleSheet.create({
 		fontSize: 18,
 		color: "#7f8c8d",
 		textAlign: "center",
+	},
+	actionButtonsContainer: {
+		flexDirection: "row",
+		marginTop: 8, // Add space between author and buttons
+		justifyContent: "center", // Center the buttons horizontally
+	},
+	actionButton: {
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		marginHorizontal: 4, // Add some space between buttons
+	},
+	actionButtonText: {
+		fontSize: 14,
+		color: "#3498db",
 	},
 	sectionContainer: {
 		backgroundColor: "#f9f9f9",
@@ -431,35 +588,97 @@ const styles = StyleSheet.create({
 		color: "#bdc3c7",
 		fontStyle: "italic",
 	},
-	buttonContainer: {
-		flexDirection: "row",
-		justifyContent: "space-around",
-		marginVertical: 20,
-	},
-	button: {
-		paddingVertical: 12,
-		paddingHorizontal: 30,
-		borderRadius: 8,
-		minWidth: 120,
-		alignItems: "center",
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
-		elevation: 3,
-	},
-	editButton: {
-		backgroundColor: "#3498db",
-	},
-	deleteButton: {
-		backgroundColor: "#e74c3c",
-	},
-	buttonText: {
-		color: "#fff",
-		fontSize: 16,
-		fontWeight: "500",
-	},
 	bottomSpacer: {
 		height: 40,
+	},
+
+	// Enhanced/updated styles
+	statusContainer: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		justifyContent: "center",
+		marginVertical: 8,
+	},
+	statusBadge: {
+		paddingVertical: 6,
+		paddingHorizontal: 12,
+		borderRadius: 20,
+		margin: 4,
+		backgroundColor: "#f0f0f0",
+		borderWidth: 1,
+		borderColor: "#ddd",
+	},
+	activeStatusBadge: {
+		backgroundColor: "#e8f4fd",
+		borderColor: "#007BFF",
+	},
+	statusText: {
+		fontSize: 14,
+		color: "#777",
+	},
+	activeStatusText: {
+		color: "#007BFF",
+		fontWeight: "600",
+	},
+
+	// Deeper Look section
+	deeperLookButton: {
+		backgroundColor: "#f0f0f0",
+		borderRadius: 8,
+		padding: 14,
+		marginVertical: 10,
+		flexDirection: "row",
+		justifyContent: "center",
+		alignItems: "center",
+		borderWidth: 1,
+		borderColor: "#ddd",
+	},
+	deeperLookButtonText: {
+		fontSize: 16,
+		color: "#3498db",
+		fontWeight: "600",
+		marginRight: 8,
+	},
+	deeperLookIcon: {
+		fontSize: 14,
+		color: "#3498db",
+	},
+	deeperDetailsContainer: {
+		overflow: "hidden",
+	},
+	deeperSectionContainer: {
+		backgroundColor: "#f5f5f5",
+		borderRadius: 10,
+		padding: 16,
+		marginBottom: 16,
+		borderLeftWidth: 3,
+		borderLeftColor: "#ddd",
+	},
+	deeperSectionTitle: {
+		fontSize: 16,
+		fontWeight: "bold",
+		color: "#7f8c8d",
+		marginBottom: 8,
+	},
+	warningTitle: {
+		color: "#e74c3c",
+	},
+	warningContainer: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		marginTop: 8,
+	},
+	warningBadge: {
+		backgroundColor: "#ffebee",
+		borderRadius: 16,
+		paddingVertical: 6,
+		paddingHorizontal: 12,
+		margin: 4,
+		borderWidth: 1,
+		borderColor: "#ffcdd2",
+	},
+	warningText: {
+		color: "#c62828",
+		fontSize: 14,
 	},
 });
