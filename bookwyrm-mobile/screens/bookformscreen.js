@@ -29,7 +29,6 @@ import {
 // OpenLibrary API for book search
 const BOOK_SEARCH_API = "https://openlibrary.org/search.json";
 
-
 export default function BookFormScreen({ route, navigation }) {
 	const editingBook = route.params?.book;
 	const [title, setTitle] = useState(editingBook ? editingBook.title : "");
@@ -209,17 +208,19 @@ export default function BookFormScreen({ route, navigation }) {
 
 	// Sync genres when the component mounts
 	useEffect(() => {
-		syncGenresWithBackend(GENRE_CHOICES).then(() => {
-			console.log("Genre synchronization attempted");
-		});
-
-		// Also consider loading genres from backend:
-		// fetchGenresFromBackend().then(backendGenres => {
-		//   if (backendGenres && backendGenres.length > 0) {
-		//     // Use backend genres instead of hardcoded ones
-		//     setDynamicGenreChoices(backendGenres);
-		//   }
-		// });
+		// Try to sync genres when the component mounts, but don't block on failure
+		syncGenresWithBackend(GENRE_CHOICES)
+			.then((result) => {
+				if (result) {
+					console.log("Genre synchronization completed successfully");
+				} else {
+					console.log("Genre synchronization skipped or failed");
+				}
+			})
+			.catch((error) => {
+				// Just log the error, don't disrupt the app flow
+				console.error("Genre sync error:", error);
+			});
 	}, []);
 
 	// Search books from OpenLibrary API
@@ -718,8 +719,16 @@ export default function BookFormScreen({ route, navigation }) {
 			}
 		}
 		// Fallback to first sentence as last resort
-		else if (book.firstSentence && book.firstSentence.length > 0) {
-			vibesText += '\n\nOpening line: "' + book.firstSentence.trim() + '"';
+		else if (book.firstSentence) {
+			// Ensure firstSentence is a string before calling trim
+			const firstSentenceText =
+				typeof book.firstSentence === "string"
+					? book.firstSentence.trim()
+					: Array.isArray(book.firstSentence)
+					? book.firstSentence[0]
+					: String(book.firstSentence);
+
+			vibesText += '\n\nOpening line: "' + firstSentenceText + '"';
 		}
 
 		// Set the vibes text (including both metadata and synopsis if available)
