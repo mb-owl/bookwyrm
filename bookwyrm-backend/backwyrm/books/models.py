@@ -12,6 +12,7 @@ GENRE_CHOICES = [
     ('romance', 'Romance'),
     ('thriller', 'Thriller'),
     ('horror', 'Horror'),
+    ('unknown', 'Unknown'),
 ]
 
 
@@ -36,8 +37,15 @@ class Book(models.Model):
     is_read = models.BooleanField(default=False)  # whether the book has been read or not
     shelved = models.BooleanField(default=False)  # whether the book is shelved or not
     publication_date = models.DateField(blank=True, null=True)  # publication date of the book, optional
-    cover = models.ImageField(upload_to='covers/', blank=True, null=True) #uploaded book cover, optional
-    created_at = models.DateTimeField(auto_now_add=True) # when the book was added to the database
+    cover = models.ImageField(upload_to='covers/', blank=True, null=True)  # uploaded book cover, optional
+    created_at = models.DateTimeField(auto_now_add=True)  # when the book was added to the database
+    updated_at = models.DateTimeField(auto_now=True)  # when the book was last updated
+    isbn = models.CharField(max_length=13, unique=True, blank=True, null=True)  # ISBN number, optional
+    language = models.CharField(max_length=50, blank=True, null=True)  # language of the book, optional
+    publisher = models.CharField(max_length=255, blank=True, null=True)  # publisher of the book, optional
+    page_count = models.PositiveIntegerField(blank=True, null=True)  # number of pages in the book, optional
+    vibes = models.CharField(max_length=255, blank=True, null=True)  # vibes of the book, optional
+    tags = models.CharField(max_length=255, blank=True, null=True)  # tags associated with the book, optional
 
     def __str__(self):
         return f'{self.title} by {self.author}'

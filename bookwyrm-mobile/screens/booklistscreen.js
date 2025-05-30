@@ -14,12 +14,8 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Define IP addresses for different environments
-const LOCAL_IP_ADDRESS = "http://192.168.0.57:8000/api";
-const BASE_URL = "http://127.0.0.1:8000/api";
-
-// Use BASE_URL for API calls
-const API_BASE_URL = BASE_URL;
+// Import API configuration
+import { API_BASE_URL, getMediaUrl } from "../utils/apiConfig";
 
 export default function BookListScreen({ route, navigation }) {
 	const [books, setBooks] = useState([]);
@@ -37,6 +33,7 @@ export default function BookListScreen({ route, navigation }) {
 	const fetchBooks = async () => {
 		try {
 			setLoading(true);
+			console.log("Fetching books...");
 
 			// Add trailing slash for Django REST consistency
 			const url = `${API_BASE_URL}/books/`;
@@ -55,16 +52,24 @@ export default function BookListScreen({ route, navigation }) {
 				let errorText = "Unknown error";
 				try {
 					errorText = await response.text();
+					console.error("Server error response:", errorText);
 				} catch (e) {
 					console.error("Error reading response text:", e);
 				}
 
-				console.error("Server error response:", errorText);
 				throw new Error(`API call failed: ${response.status} ${errorText}`);
 			}
 
 			const data = await response.json();
 			console.log("Books fetched successfully:", data.length, "books");
+
+			// Log the first book for debugging
+			if (data.length > 0) {
+				console.log(
+					"First book sample:",
+					JSON.stringify(data[0]).substring(0, 200) + "..."
+				);
+			}
 
 			setBooks(data);
 
@@ -74,15 +79,23 @@ export default function BookListScreen({ route, navigation }) {
 			console.error("Error fetching books:", error);
 
 			// Try to load from cache as fallback
-			const cachedBooks = await AsyncStorage.getItem("books");
-			if (cachedBooks) {
-				console.log("Loading books from cache");
-				setBooks(JSON.parse(cachedBooks));
+			try {
+				const cachedBooks = await AsyncStorage.getItem("books");
+				if (cachedBooks) {
+					console.log("Loading books from cache");
+					setBooks(JSON.parse(cachedBooks));
+				}
+			} catch (cacheError) {
+				console.error("Error loading from cache:", cacheError);
 			}
 
 			Alert.alert(
 				"Connection Error",
-				"Could not connect to the server. Please check your connection and server status.\n\nError: " +
+				"Could not connect to the server at " +
+					API_BASE_URL +
+					".\n\n" +
+					"Please check your connection and server status.\n\n" +
+					"Error: " +
 					error.message
 			);
 		} finally {
@@ -228,7 +241,15 @@ export default function BookListScreen({ route, navigation }) {
 
 	// Navigate to detail screen on item press
 	const openBookDetail = (book) => {
-		navigation.navigate("BookDetailScreen", { book });
+		try {
+			navigation.navigate("BookDetailScreen", { book });
+		} catch (error) {
+			console.error("Navigation error:", error);
+			Alert.alert(
+				"Error",
+				"There was a problem opening this book. Please try again."
+			);
+		}
 	}; // possible error with BookDetailScreen vs BookDetail)
 
 	const renderBookDetail = () => {
@@ -252,9 +273,7 @@ export default function BookListScreen({ route, navigation }) {
 							source={{
 								uri: book.cover.startsWith("http")
 									? book.cover
-									: `${API_BASE_URL}/media/covers/${book.cover
-											.split("/")
-											.pop()}`,
+									: `${getMediaUrl()}covers/${book.cover.split("/").pop()}`,
 							}}
 							style={styles.coverImage}
 							accessible={true}
@@ -701,7 +720,6 @@ const styles = StyleSheet.create({
 	},
 	editButton: { backgroundColor: "#2196F3" },
 	deleteButton: { backgroundColor: "#f44336" },
-	buttonText: { color: "#FFF", fontSize: 16 },
 	buttonText: { color: "#FFF", fontSize: 16 },
 	sortRow: {
 		flexDirection: "row",

@@ -8,12 +8,8 @@ import {
 	Alert,
 } from "react-native";
 
-// Define IP addresses for different environments
-const LOCAL_IP_ADDRESS = "http://192.168.0.57:8000/api";
-const BASE_URL = "http://127.0.0.1:8000/api";
-
-// Use BASE_URL for API calls
-const API_BASE_URL = BASE_URL;
+// Import API configuration
+import { API_BASE_URL, getMediaUrl } from "../utils/apiConfig";
 
 export default function BookDetailScreen({ route, navigation }) {
 	const { book } = route.params; // book object passed from list
@@ -95,7 +91,7 @@ export default function BookDetailScreen({ route, navigation }) {
 					source={{
 						uri: book.cover.startsWith("http")
 							? book.cover
-							: `${API_BASE_URL}/media/covers/${book.cover.split("/").pop()}`,
+							: `${getMediaUrl()}covers/${book.cover.split("/").pop()}`,
 					}}
 					style={styles.coverImage}
 					accessible={true}
