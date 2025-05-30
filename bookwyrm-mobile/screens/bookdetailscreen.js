@@ -13,6 +13,7 @@ import {
 
 // Import API configuration
 import { API_BASE_URL, getMediaUrl } from "../utils/apiConfig";
+import HamburgerMenu from "../components/HamburgerMenu";
 
 export default function BookDetailScreen({ route, navigation }) {
 	const { book: initialBook, bookId } = route.params; // Get book object or ID from navigation
@@ -38,31 +39,21 @@ export default function BookDetailScreen({ route, navigation }) {
 		}
 	}, [book]);
 
-	// Add this to ensure our custom header is respected
+	// Update this useEffect to replace favorite star with back button
 	useEffect(() => {
-		// Add home button to the header and favorite star
+		// Replace favorite star with back button in header
 		navigation.setOptions({
-			headerLeft: () => (
+			headerLeft: () => <HamburgerMenu />,
+			headerRight: () => (
 				<TouchableOpacity
-					style={styles.homeButton}
-					onPress={() => navigation.navigate("WelcomeScreen")}
+					style={styles.backButton}
+					onPress={() => navigation.goBack()}
 				>
-					<Text style={styles.homeButtonText}>🏠</Text>
+					<Text style={styles.backButtonText}>↩ Back</Text>
 				</TouchableOpacity>
 			),
-			headerRight: () =>
-				book && (
-					<TouchableOpacity
-						style={styles.favoriteButton}
-						onPress={toggleFavorite}
-					>
-						<Text style={styles.favoriteButtonText}>
-							{book.favorite ? "⭐" : "☆"}
-						</Text>
-					</TouchableOpacity>
-				),
 		});
-	}, [navigation, book]);
+	}, [navigation]);
 
 	// Add function to toggle favorite status
 	const toggleFavorite = async () => {
@@ -297,9 +288,21 @@ export default function BookDetailScreen({ route, navigation }) {
 				</View>
 			</View>
 
-			{/* Primary Details Section */}
+			{/* Primary Details Section - MODIFIED to add favorite star */}
 			<View style={styles.sectionContainer}>
-				<Text style={styles.sectionTitle}>Book Details</Text>
+				<View style={styles.sectionHeaderRow}>
+					<Text style={styles.sectionTitle}>Book Details</Text>
+					{book && (
+						<TouchableOpacity
+							style={styles.sectionFavoriteButton}
+							onPress={toggleFavorite}
+						>
+							<Text style={styles.favoriteButtonText}>
+								{book.favorite ? "⭐" : "☆"}
+							</Text>
+						</TouchableOpacity>
+					)}
+				</View>
 				<View style={styles.sectionDivider} />
 
 				{renderField("Genre", book.genre)}
@@ -806,5 +809,26 @@ const styles = StyleSheet.create({
 	favoriteText: {
 		color: "#856404",
 		fontWeight: "600",
+	},
+
+	// Add styles for the back button in header
+	backButton: {
+		padding: 10,
+		marginRight: 5,
+	},
+	backButtonText: {
+		fontSize: 16,
+		color: "#007BFF",
+	},
+
+	// Add styles for the section header row with favorite button
+	sectionHeaderRow: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		marginBottom: 8,
+	},
+	sectionFavoriteButton: {
+		padding: 5,
 	},
 });

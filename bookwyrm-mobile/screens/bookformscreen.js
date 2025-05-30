@@ -25,6 +25,7 @@ import {
 	syncGenresWithBackend,
 	fetchGenresFromBackend,
 } from "../utils/genreSync";
+import HamburgerMenu from "../components/HamburgerMenu";
 
 // OpenLibrary API for book search
 const BOOK_SEARCH_API = "https://openlibrary.org/search.json";
@@ -213,16 +214,9 @@ export default function BookFormScreen({ route, navigation }) {
 
 	// Modify the existing useEffect for navigation options
 	useEffect(() => {
-		// Add home button to the header and favorite star button
+		// Replace home button with hamburger menu and keep favorite star button
 		navigation.setOptions({
-			headerLeft: () => (
-				<TouchableOpacity
-					style={styles.homeButton}
-					onPress={() => navigation.navigate("WelcomeScreen")}
-				>
-					<Text style={styles.homeButtonText}>🏠</Text>
-				</TouchableOpacity>
-			),
+			headerLeft: () => <HamburgerMenu />,
 			headerRight: () => (
 				<TouchableOpacity
 					style={styles.favoriteButton}

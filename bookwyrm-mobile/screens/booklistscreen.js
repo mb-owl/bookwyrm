@@ -16,6 +16,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Import API configuration
 import { API_BASE_URL, getMediaUrl } from "../utils/apiConfig";
+import HamburgerMenu from "../components/HamburgerMenu";
 
 export default function BookListScreen({ route, navigation }) {
 	const [books, setBooks] = useState([]);
@@ -33,16 +34,9 @@ export default function BookListScreen({ route, navigation }) {
 
 	// Add this to ensure our custom header is respected
 	useEffect(() => {
-		// Add home button to the header
+		// Replace home button with hamburger menu
 		navigation.setOptions({
-			headerLeft: () => (
-				<TouchableOpacity
-					style={styles.homeButton}
-					onPress={() => navigation.navigate("WelcomeScreen")}
-				>
-					<Text style={styles.homeButtonText}>🏠</Text>
-				</TouchableOpacity>
-			),
+			headerLeft: () => <HamburgerMenu />,
 		});
 	}, [navigation]);
 

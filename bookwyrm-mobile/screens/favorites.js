@@ -12,6 +12,7 @@ import {
 
 // Import API configuration
 import { API_BASE_URL, getMediaUrl } from "../utils/apiConfig";
+import HamburgerMenu from "../components/HamburgerMenu";
 
 const FavoritesScreen = ({ navigation }) => {
 	const [favoriteBooks, setFavoriteBooks] = useState([]);
@@ -25,14 +26,7 @@ const FavoritesScreen = ({ navigation }) => {
 	// Add home button to the header
 	useEffect(() => {
 		navigation.setOptions({
-			headerLeft: () => (
-				<TouchableOpacity
-					style={styles.homeButton}
-					onPress={() => navigation.navigate("WelcomeScreen")}
-				>
-					<Text style={styles.homeButtonText}>🏠</Text>
-				</TouchableOpacity>
-			),
+			headerLeft: () => <HamburgerMenu />,
 		});
 	}, [navigation]);
 
