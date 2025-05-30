@@ -21,11 +21,14 @@ import * as ImagePicker from "expo-image-picker";
 
 // Import API configuration
 import { API_BASE_URL } from "../utils/apiConfig";
-import { syncGenresWithBackend, fetchGenresFromBackend } from '../utils/genreSync';
+import {
+	syncGenresWithBackend,
+	fetchGenresFromBackend,
+} from "../utils/genreSync";
 
 // OpenLibrary API for book search
 const BOOK_SEARCH_API = "https://openlibrary.org/search.json";
-const COVER_API_BASE = "https://covers.openlibrary.org/b/id/";
+
 
 export default function BookFormScreen({ route, navigation }) {
 	const editingBook = route.params?.book;
@@ -209,7 +212,7 @@ export default function BookFormScreen({ route, navigation }) {
 		syncGenresWithBackend(GENRE_CHOICES).then(() => {
 			console.log("Genre synchronization attempted");
 		});
-		
+
 		// Also consider loading genres from backend:
 		// fetchGenresFromBackend().then(backendGenres => {
 		//   if (backendGenres && backendGenres.length > 0) {
@@ -1011,7 +1014,7 @@ export default function BookFormScreen({ route, navigation }) {
 				formData.append("content_warnings", contentWarnings);
 			}
 
-			formData.append("emoji", emoji || "📚");			
+			formData.append("emoji", emoji || "📚");
 			// Determine the API endpoint with proper trailing slash
 			let url = editingBook
 				? `${API_BASE_URL}/books/${editingBook.id}/`
