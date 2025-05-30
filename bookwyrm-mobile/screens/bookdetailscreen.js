@@ -396,34 +396,68 @@ export default function BookDetailScreen({ route, navigation }) {
 
 	// Handle deletion
 	const handleDelete = async () => {
-		Alert.alert("Delete Book", "Are you sure you want to delete this book?", [
-			{ text: "Cancel", style: "cancel" },
-			{
-				text: "Delete",
-				style: "destructive",
-				onPress: async () => {
-					try {
-						setLoading(true);
-						const endpoint = getApiEndpoint(`books/${book.id}`);
-						const response = await fetch(endpoint, {
-							method: "DELETE",
-						});
-
-						if (!response.ok) {
-							throw new Error(`Delete failed: ${response.status}`);
-						}
-
-						Alert.alert("Success", "Book deleted successfully");
-						navigation.navigate("BookListScreen", { refresh: Date.now() });
-					} catch (err) {
-						console.error("Error deleting book:", err);
-						Alert.alert("Error", `Failed to delete book: ${err.message}`);
-					} finally {
-						setLoading(false);
-					}
+		// confirm delete book
+		Alert.alert(
+			"Delete Book",
+			"This book will be moved to Recently Deleted for 30 days before being permanently removed.",
+			[
+				{
+					text: "Cancel",
+					style: "cancel",
 				},
-			},
-		]);
+				{
+					text: "Delete",
+					style: "destructive",
+					onPress: async () => {
+						try {
+							// Show loading indicator
+							setLoading(true);
+
+							// Use the API endpoint helper for consistent URL formatting
+							const endpoint = getApiEndpoint(`books/${book.id}`);
+							console.log("Moving book to trash:", endpoint);
+
+							// Call API to soft delete book
+							const response = await fetch(endpoint, {
+								method: "DELETE",
+							});
+
+							console.log("Delete response status:", response.status);
+
+							if (!response.ok) {
+								let errorText = "";
+								try {
+									errorText = await response.text();
+								} catch (e) {
+									errorText = "Unknown error";
+								}
+								console.error("Server response:", errorText);
+								throw new Error(
+									`Delete failed: ${response.status} ${errorText}`
+								);
+							}
+
+							Alert.alert(
+								"Success",
+								"Book moved to Recently Deleted. You can find it in the menu under 'Recently Deleted' for the next 30 days."
+							);
+
+							// Navigate back to book list with refresh flag
+							navigation.navigate("BookListScreen", { refresh: Date.now() });
+						} catch (error) {
+							console.error("Error deleting book:", error);
+							Alert.alert(
+								"Delete Failed",
+								"Could not delete the book. Please try again later. Error: " +
+									error.message
+							);
+						} finally {
+							setLoading(false);
+						}
+					},
+				},
+			]
+		);
 	};
 
 	// Navigate to edit screen

@@ -169,7 +169,10 @@ export default function WelcomeScreen({ navigation }) {
 			}
 		} catch (error) {
 			console.error("Error recording reading day:", error);
-			Alert.alert("Error", "Failed to record your reading day. Please try again.");
+			Alert.alert(
+				"Error",
+				"Failed to record your reading day. Please try again."
+			);
 		} finally {
 			setIsLoading(false);
 		}

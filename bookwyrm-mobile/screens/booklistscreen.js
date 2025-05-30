@@ -26,11 +26,40 @@ export default function BookListScreen({ route, navigation }) {
 	const [showSortModal, setShowSortModal] = useState(false); // New state for sort modal
 	const { book, refresh } = route.params || {}; // book object and refresh flag passed from list
 
-	// Add a dependency on 'refresh' to trigger refetch when returning from delete
+	// Enhanced useEffect for better restoration handling
 	useEffect(() => {
-		console.log("BookListScreen mounted or refresh triggered");
-		fetchBooks();
-	}, [refresh]); // This will re-run when the refresh parameter changes
+		console.log("BookListScreen mounted or refresh triggered", route.params);
+
+		const loadBooks = async () => {
+			try {
+				setLoading(true);
+
+				// Add a longer delay when coming from restoration if specified
+				if (route.params?.forceDelay) {
+					console.log("Adding extra delay for book restoration...");
+					await new Promise((resolve) => setTimeout(resolve, 1000));
+				}
+				// Regular delay for normal refresh
+				else if (route.params?.refresh) {
+					console.log("Adding standard refresh delay...");
+					await new Promise((resolve) => setTimeout(resolve, 300));
+				}
+
+				await fetchBooks();
+
+				// If we have a restored book ID, find and highlight it
+				if (route.params?.restored && route.params?.restoredBookId) {
+					console.log("Restored book ID:", route.params.restoredBookId);
+				}
+			} catch (error) {
+				console.error("Error loading books:", error);
+			} finally {
+				setLoading(false);
+			}
+		};
+
+		loadBooks();
+	}, [route.params?.refresh]); // This will re-run when the refresh parameter changes
 
 	// Add this to ensure our custom header is respected
 	useEffect(() => {
@@ -49,9 +78,9 @@ export default function BookListScreen({ route, navigation }) {
 		});
 	}, [navigation]);
 
+	// Enhanced fetchBooks function with better error handling
 	const fetchBooks = async () => {
 		try {
-			setLoading(true);
 			console.log("Fetching books...");
 
 			// Use the helper function to get proper URL formatting
@@ -63,6 +92,8 @@ export default function BookListScreen({ route, navigation }) {
 				headers: {
 					Accept: "application/json",
 				},
+				// Ensure we get fresh data, not cached
+				cache: "no-store",
 			});
 
 			console.log("Response status:", response.status);
@@ -82,14 +113,7 @@ export default function BookListScreen({ route, navigation }) {
 			const data = await response.json();
 			console.log("Books fetched successfully:", data.length, "books");
 
-			// Log the first book for debugging
-			if (data.length > 0) {
-				console.log(
-					"First book sample:",
-					JSON.stringify(data[0]).substring(0, 200) + "..."
-				);
-			}
-
+			// Properly update the books state
 			setBooks(data);
 
 			// Update cached data
@@ -413,70 +437,79 @@ export default function BookListScreen({ route, navigation }) {
 		</Modal>
 	);
 
+	// Update handleDelete function to use soft delete
 	const handleDelete = async () => {
 		// confirm delete book
-		Alert.alert("Delete Book", "Are you sure you want to delete this book?", [
-			{
-				text: "Cancel",
-				style: "cancel",
-			},
-			{
-				text: "Delete",
-				style: "destructive",
-				onPress: async () => {
-					try {
-						// Show loading indicator
-						setLoading(true);
-
-						// Make sure the API endpoint has the trailing slash (Django often requires this)
-						const deleteUrl = `${API_BASE_URL}/books/${book.id}/`;
-						console.log("Attempting to delete book at URL:", deleteUrl);
-
-						// Call API to delete book
-						const response = await fetch(deleteUrl, {
-							method: "DELETE",
-							// Don't set Content-Type for DELETE requests
-						});
-
-						console.log("Delete response status:", response.status);
-
-						if (!response.ok) {
-							let errorText = "";
-							try {
-								errorText = await response.text();
-							} catch (e) {
-								errorText = "Unknown error";
-							}
-							console.error("Server response:", errorText);
-							throw new Error(`Delete failed: ${response.status} ${errorText}`);
-						}
-
-						// Success - update local state immediately
-						setBooks(books.filter((b) => b.id !== book.id));
-
-						// Update AsyncStorage
-						AsyncStorage.setItem(
-							"books",
-							JSON.stringify(books.filter((b) => b.id !== book.id))
-						);
-
-						Alert.alert("Success", "Book deleted successfully");
-
-						// Modified navigation - go directly to BookListScreen with refresh
-						navigation.navigate("BookListScreen", { refresh: Date.now() });
-					} catch (error) {
-						console.error("Error deleting book:", error);
-						Alert.alert(
-							"Delete Failed",
-							"Could not delete the book. Please try again later. Error: " +
-								error.message
-						);
-					} finally {
-						setLoading(false);
-					}
+		Alert.alert(
+			"Delete Book",
+			"This book will be moved to Recently Deleted for 30 days before being permanently removed.",
+			[
+				{
+					text: "Cancel",
+					style: "cancel",
 				},
-			},
-		]);
+				{
+					text: "Delete",
+					style: "destructive",
+					onPress: async () => {
+						try {
+							// Show loading indicator
+							setLoading(true);
+
+							// Make sure the API endpoint has the trailing slash (Django often requires this)
+							const deleteUrl = getApiEndpoint(`books/${book.id}`);
+							console.log("Moving book to trash:", deleteUrl);
+
+							// Call API to soft delete the book
+							const response = await fetch(deleteUrl, {
+								method: "DELETE",
+							});
+
+							console.log("Delete response status:", response.status);
+
+							if (!response.ok) {
+								let errorText = "";
+								try {
+									errorText = await response.text();
+								} catch (e) {
+									errorText = "Unknown error";
+								}
+								console.error("Server response:", errorText);
+								throw new Error(
+									`Delete failed: ${response.status} ${errorText}`
+								);
+							}
+
+							// Success - update local state immediately
+							setBooks(books.filter((b) => b.id !== book.id));
+
+							// Update AsyncStorage
+							AsyncStorage.setItem(
+								"books",
+								JSON.stringify(books.filter((b) => b.id !== book.id))
+							);
+
+							Alert.alert(
+								"Success",
+								"Book moved to Recently Deleted. You can find it in the menu under 'Recently Deleted' for the next 30 days."
+							);
+
+							// Modified navigation - go directly to BookListScreen with refresh
+							navigation.navigate("BookListScreen", { refresh: Date.now() });
+						} catch (error) {
+							console.error("Error deleting book:", error);
+							Alert.alert(
+								"Delete Failed",
+								"Could not delete the book. Please try again later. Error: " +
+									error.message
+							);
+						} finally {
+							setLoading(false);
+						}
+					},
+				},
+			]
+		);
 	};
 
 	const goToEditForm = () => {
@@ -626,11 +659,11 @@ export default function BookListScreen({ route, navigation }) {
 		}
 	};
 
-	// Handle bulk delete
+	// Also update handleBulkDelete to explain the 30-day trash
 	const handleBulkDelete = () => {
 		Alert.alert(
 			"Delete Multiple Books",
-			`Are you sure you want to delete ${selectedBooks.length} books? This cannot be undone.`,
+			`${selectedBooks.length} books will be moved to Recently Deleted for 30 days before being permanently removed.`,
 			[
 				{ text: "Cancel", style: "cancel" },
 				{
@@ -662,7 +695,10 @@ export default function BookListScreen({ route, navigation }) {
 							setSelectedBooks([]);
 
 							// Show success message
-							Alert.alert("Success", `Deleted ${selectedBooks.length} books`);
+							Alert.alert(
+								"Success",
+								`${selectedBooks.length} books moved to Recently Deleted. You can find them in the menu under 'Recently Deleted' for the next 30 days.`
+							);
 
 							// Update cache
 							AsyncStorage.setItem(

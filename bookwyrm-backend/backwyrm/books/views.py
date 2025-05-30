@@ -1,120 +1,132 @@
 from django.shortcuts import render
-from rest_framework import viewsets, permissions, status
+from django.utils import timezone
+from datetime import date, datetime, timedelta
+from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Book, Genre, BookPhoto, ReadingDay
+from .models import Book, Genre, ReadingDay
 from .serializers import BookSerializer, GenreSerializer
 from rest_framework.views import APIView
-from datetime import date, datetime
 
 # Create your views here.
 class BookViewSet(viewsets.ModelViewSet):
     """
     API endpoint for books
     """
-    queryset = Book.objects.all()
     serializer_class = BookSerializer
     
-    def get_serializer_context(self):
-        """Add request to serializer context for URL generation"""
-        context = super().get_serializer_context()
-        context.update({"request": self.request})
-        return context
+    def get_queryset(self):
+        """Override queryset to exclude soft-deleted books by default"""
+        queryset = Book.objects.all()
+        
+        # Only include non-deleted books unless specifically requesting trash
+        # or using a restore action
+        if self.action != 'trash' and self.action != 'restore':
+            queryset = queryset.filter(is_deleted=False)
+            
+        return queryset
     
-    def create(self, request, *args, **kwargs):
-        """Create a new book with optional photos"""
-        try:
-            # Log incoming data for debugging
-            print(f"Creating book with data: {request.data}")
+    def get_object(self):
+        """
+        Override get_object to handle soft-deleted items in restoration
+        """
+        # Get the object ID from the URL
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+        filter_kwargs = {self.lookup_field: self.kwargs[lookup_url_kwarg]}
+        
+        # For restore action, we need to find the book even if it's deleted
+        if self.action == 'restore':
+            # Get all books including deleted ones
+            queryset = Book.objects.all()
+            obj = get_object_or_404(queryset, **filter_kwargs)
             
-            # Get photo count from request
-            photo_count = int(request.data.get('book_photo_count', 0))
-            print(f"Photo count: {photo_count}")
-            
-            # Process book data first
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            book = serializer.save()
-            
-            # Process and save photos if any exist
-            if photo_count > 0:
-                for i in range(photo_count):
-                    photo_field = f'book_photo_{i}'
-                    if photo_field in request.FILES:
-                        # Log photo data
-                        photo_file = request.FILES[photo_field]
-                        print(f"Processing photo {i}: {photo_file.name}, size: {photo_file.size}")
-                        
-                        # Create BookPhoto object with the uploaded file
-                        book_photo = BookPhoto.objects.create(
-                            book=book, 
-                            photo=photo_file
-                        )
-                        print(f"Created photo with ID: {book_photo.id}")
-            
-            # Return the serialized book including the photos
-            serializer = self.get_serializer(book)
-            headers = self.get_success_headers(serializer.data)
-            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-        except Exception as e:
-            print(f"Error creating book: {str(e)}")
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            # Check object permissions
+            self.check_object_permissions(self.request, obj)
+            return obj
+        
+        # For other actions, use the standard behavior
+        return super().get_object()
     
-    def update(self, request, *args, **kwargs):
-        """Update a book with optional photos"""
+    def destroy(self, request, *args, **kwargs):
+        """Override delete to perform soft delete instead of hard delete"""
+        book = self.get_object()
+        book.soft_delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    @action(detail=False, methods=['get'])
+    def trash(self, request):
+        """Get all books in trash (deleted but not yet permanently removed)"""
+        # Get books that are marked as deleted
+        deleted_books = Book.objects.filter(is_deleted=True)
+        serializer = self.get_serializer(deleted_books, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def restore(self, request, pk=None):
+        """Restore a book from trash and return complete book data"""
         try:
-            print(f"Updating book with data: {request.data}")
+            # Get the book using our overridden get_object method
+            # which will find books even if they're deleted
+            book = self.get_object()
             
-            partial = kwargs.pop('partial', False)
-            instance = self.get_object()
+            # Log the book we're trying to restore
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Attempting to restore book: {pk} - {book.title}")
             
-            # Get photo count from request
-            photo_count = int(request.data.get('book_photo_count', 0))
-            print(f"Photo count: {photo_count}")
+            if not book.is_deleted:
+                return Response(
+                    {"detail": "This book is not in trash."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             
-            # Process book data first
-            serializer = self.get_serializer(instance, data=request.data, partial=partial)
-            serializer.is_valid(raise_exception=True)
-            book = serializer.save()
+            # Restore the book
+            book.restore()
+            logger.info(f"Book {pk} restored successfully")
             
-            # Process photos if any exist
-            if photo_count > 0:
-                # Remove existing photos if we're replacing them
-                # Only when explicitly specified or in a full update
-                if not partial or request.data.get('replace_photos') == 'true':
-                    print(f"Deleting existing photos for book: {book.id}")
-                    BookPhoto.objects.filter(book=book).delete()
-                
-                # Add the new photos
-                for i in range(photo_count):
-                    photo_field = f'book_photo_{i}'
-                    if photo_field in request.FILES:
-                        # Log photo data
-                        photo_file = request.FILES[photo_field]
-                        print(f"Processing photo {i}: {photo_file.name}, size: {photo_file.size}")
-                        
-                        # Create BookPhoto object with the uploaded file
-                        book_photo = BookPhoto.objects.create(
-                            book=book, 
-                            photo=photo_file
-                        )
-                        print(f"Created photo with ID: {book_photo.id}")
+            # Get fresh book data after restoration
+            book.refresh_from_db()
             
-            if getattr(instance, '_prefetched_objects_cache', None):
-                # If 'prefetch_related' has been applied, clear the cache
-                instance._prefetched_objects_cache = {}
+            # Verify the restoration was successful
+            if book.is_deleted:
+                logger.error(f"Book {pk} is still marked as deleted after restore")
+                return Response(
+                    {"detail": "Failed to restore the book. It's still marked as deleted."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
             
-            # Return the serialized book including the photos
+            # Return the complete serialized book data
             serializer = self.get_serializer(book)
             return Response(serializer.data)
+            
         except Exception as e:
-            print(f"Error updating book: {str(e)}")
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            # Log the detailed error
+            import logging
+            import traceback
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error restoring book {pk}: {str(e)}")
+            logger.error(traceback.format_exc())
+            
+            # Return a helpful error response
+            return Response(
+                {"detail": f"Server error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
-    def partial_update(self, request, *args, **kwargs):
-        """Partial update for books"""
-        kwargs['partial'] = True
-        return self.update(request, *args, **kwargs)
+    @action(detail=True, methods=['delete'])
+    def permanent_delete(self, request, pk=None):
+        """Permanently delete a book from the database"""
+        book = self.get_object()
+        book.delete()  # Actually delete from database
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    @action(detail=False, methods=['post'])
+    def empty_trash(self, request):
+        """Permanently delete all books in trash"""
+        deleted_books = Book.objects.filter(is_deleted=True)
+        count = deleted_books.count()
+        deleted_books.delete()
+        return Response({"detail": f"Permanently deleted {count} books."})
 
 class GenreViewSet(viewsets.ModelViewSet):
     """

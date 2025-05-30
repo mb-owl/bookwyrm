@@ -1,63 +1,32 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, Modal, StyleSheet } from "react-native";
+import {
+	View,
+	Text,
+	TouchableOpacity,
+	StyleSheet,
+	Modal,
+	ScrollView,
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
 
-export default function HamburgerMenu() {
-	const navigation = useNavigation();
+const HamburgerMenu = () => {
 	const [menuVisible, setMenuVisible] = useState(false);
+	const navigation = useNavigation();
 
-	// Toggle menu visibility
-	const toggleMenu = () => {
-		setMenuVisible(!menuVisible);
+	const navigateTo = (screen) => {
+		setMenuVisible(false);
+		navigation.navigate(screen);
 	};
-
-	// Navigation handler with error handling for screens that don't exist yet
-	const navigateToScreen = (screenName) => {
-		try {
-			// List of screens that actually exist in the app
-			const existingScreens = [
-				"WelcomeScreen",
-				"BookListScreen",
-				"BookFormScreen",
-				"BookDetailScreen",
-				"Favorites",
-			];
-
-			if (existingScreens.includes(screenName)) {
-				setMenuVisible(false);
-				navigation.navigate(screenName);
-			} else {
-				setMenuVisible(false);
-				Alert.alert(
-					"Coming Soon",
-					`The ${screenName} feature is under development and will be available soon!`
-				);
-			}
-		} catch (error) {
-			console.error("Navigation error:", error);
-			Alert.alert("Navigation Error", "Could not navigate to this screen.");
-		}
-	};
-
-	// Menu items configuration
-	const menuItems = [
-		{ title: "Home", screen: "WelcomeScreen", icon: "🏠" },
-		{ title: "Book Library", screen: "BookListScreen", icon: "📚" },
-		{ title: "Add New Book", screen: "BookFormScreen", icon: "➕" },
-		{ title: "Favorites", screen: "Favorites", icon: "⭐" },
-		{ title: "Bookshelf", screen: "Bookshelf", icon: "📖" },
-		{ title: "Quotes & Notes", screen: "QuotesAndNotes", icon: "✏️" },
-		{ title: "My Photo Uploads", screen: "MyPhotoUploads", icon: "📷" },
-	];
 
 	return (
 		<>
-			{/* Hamburger Menu Button */}
-			<TouchableOpacity style={styles.menuButton} onPress={toggleMenu}>
-				<Text style={styles.menuButtonText}>☰</Text>
+			<TouchableOpacity
+				style={styles.hamburgerButton}
+				onPress={() => setMenuVisible(true)}
+			>
+				<Text style={styles.hamburgerIcon}>☰</Text>
 			</TouchableOpacity>
 
-			{/* Dropdown Menu Modal */}
 			<Modal
 				visible={menuVisible}
 				transparent={true}
@@ -69,65 +38,105 @@ export default function HamburgerMenu() {
 					activeOpacity={1}
 					onPress={() => setMenuVisible(false)}
 				>
-					<View style={styles.dropdownMenu}>
-						{menuItems.map((item, index) => (
-							<TouchableOpacity
-								key={index}
-								style={styles.menuItem}
-								onPress={() => navigateToScreen(item.screen)}
-							>
-								<Text style={styles.menuItemIcon}>{item.icon}</Text>
-								<Text style={styles.menuItemText}>{item.title}</Text>
-							</TouchableOpacity>
-						))}
+					<View style={styles.menuContainer}>
+						<MenuItem
+							icon="📚"
+							label="Book Library"
+							onPress={() => navigateTo("BookListScreen")}
+						/>
+
+						<MenuItem
+							icon="➕"
+							label="Add New Book"
+							onPress={() => navigateTo("BookFormScreen")}
+						/>
+
+						<MenuItem
+							icon="⭐"
+							label="Favorites"
+							onPress={() => navigateTo("Favorites")}
+						/>
+
+						<MenuItem
+							icon="📖"
+							label="Bookshelf"
+							onPress={() => navigateTo("BookListScreen")}
+						/>
+
+						<MenuItem
+							icon="📝"
+							label="Quotes & Notes"
+							onPress={() => navigateTo("WelcomeScreen")}
+						/>
+
+						<MenuItem
+							icon="📷"
+							label="My Photo Uploads"
+							onPress={() => navigateTo("WelcomeScreen")}
+						/>
+
+						<MenuItem
+							icon="🗑️"
+							label="Recently Deleted"
+							onPress={() => navigateTo("Trash")}
+						/>
 					</View>
 				</TouchableOpacity>
 			</Modal>
 		</>
 	);
-}
+};
+
+// Extracted MenuItem component for consistency
+const MenuItem = ({ icon, label, onPress }) => (
+	<TouchableOpacity style={styles.menuItem} onPress={onPress}>
+		<Text style={styles.menuItemIcon}>{icon}</Text>
+		<Text style={styles.menuItemLabel}>{label}</Text>
+	</TouchableOpacity>
+);
 
 const styles = StyleSheet.create({
-	menuButton: {
+	hamburgerButton: {
 		padding: 10,
 	},
-	menuButtonText: {
+	hamburgerIcon: {
 		fontSize: 24,
-		color: "#2c3e50",
+		color: "#333",
 	},
 	modalOverlay: {
 		flex: 1,
-		backgroundColor: "rgba(0,0,0,0.5)",
+		backgroundColor: "rgba(0, 0, 0, 0.5)",
+		justifyContent: "flex-start",
+		alignItems: "center",
+		paddingTop: 50,
 	},
-	dropdownMenu: {
-		position: "absolute",
-		top: 80,
-		left: 20,
+	menuContainer: {
+		width: "75%",
 		backgroundColor: "white",
-		borderRadius: 8,
-		paddingVertical: 8,
-		paddingHorizontal: 4,
-		width: 200,
+		borderRadius: 15,
+		paddingVertical: 10,
+		elevation: 5,
 		shadowColor: "#000",
 		shadowOffset: { width: 0, height: 2 },
 		shadowOpacity: 0.25,
 		shadowRadius: 3.84,
-		elevation: 5,
 	},
 	menuItem: {
 		flexDirection: "row",
 		alignItems: "center",
 		paddingVertical: 12,
-		paddingHorizontal: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: "#f0f0f0",
+		paddingHorizontal: 20,
 	},
 	menuItemIcon: {
 		fontSize: 20,
 		marginRight: 12,
+		width: 24,
+		textAlign: "center",
 	},
-	menuItemText: {
+	menuItemLabel: {
 		fontSize: 16,
-		color: "#2c3e50",
+		color: "#333",
 	},
 });
+
+export default HamburgerMenu;

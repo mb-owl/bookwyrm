@@ -2,14 +2,14 @@
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import GenreViewSet, ReadingStatsView
+from .views import BookViewSet, ReadingStatsView
 
 router = DefaultRouter()
-# ...existing router registrations...
-router.register(r'genres', GenreViewSet)
+router.register(r'books', BookViewSet)
 
 urlpatterns = [
-    # ...existing url patterns...
-    path('', include(router.urls)),
+    # ...existing urls...
     path('reading-stats/', ReadingStatsView.as_view(), name='reading-stats'),
 ]
+
+urlpatterns += router.urls

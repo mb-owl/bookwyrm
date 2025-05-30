@@ -110,6 +110,10 @@ class Book(models.Model):
     tags = models.CharField(max_length=255, blank=True, null=True)
     content_warnings = models.TextField(blank=True, null=True)
     emoji = models.CharField(max_length=10, blank=True, null=True, default="📚")
+    
+    # Add fields for tracking deleted books
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f'{self.title} by {self.author}'
@@ -126,6 +130,35 @@ class Book(models.Model):
             return Genre.objects.get(code=self.genre)
         except Genre.DoesNotExist:
             return Genre.objects.get(code='unknown')
+    
+    # Enhanced methods for soft delete functionality
+    def soft_delete(self):
+        """Mark book as deleted and set deletion timestamp"""
+        from django.utils import timezone
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save()
+        
+    def restore(self):
+        """Restore a deleted book"""
+        self.is_deleted = False
+        self.deleted_at = None
+        self.save()
+    
+    @property
+    def days_until_permanent_deletion(self):
+        """Calculate days remaining until permanent deletion"""
+        if not self.is_deleted or not self.deleted_at:
+            return None
+            
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        # Books remain in trash for 30 days
+        deletion_date = self.deleted_at + timedelta(days=30)
+        days_left = (deletion_date - timezone.now()).days
+        
+        return max(0, days_left)
 
 
 # New model for book photos
