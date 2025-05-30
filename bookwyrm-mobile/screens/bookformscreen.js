@@ -21,6 +21,7 @@ import * as ImagePicker from "expo-image-picker";
 
 // Import API configuration
 import { API_BASE_URL } from "../utils/apiConfig";
+import { syncGenresWithBackend, fetchGenresFromBackend } from '../utils/genreSync';
 
 // OpenLibrary API for book search
 const BOOK_SEARCH_API = "https://openlibrary.org/search.json";
@@ -98,6 +99,16 @@ export default function BookFormScreen({ route, navigation }) {
 		{ label: "Romance", value: "romance" },
 		{ label: "Thriller", value: "thriller" },
 		{ label: "Horror", value: "horror" },
+		{ label: "Young Adult", value: "young-adult" },
+		{ label: "Children", value: "children" },
+		{ label: "Dystopian", value: "dystopian" },
+		{ label: "Utopian", value: "utopian" },
+		{ label: "Supernatural", value: "supernatural" },
+		{ label: "Paranormal", value: "paranormal" },
+		{ label: "Graphic Novel", value: "graphic-novel" },
+		{ label: "Poetry", value: "poetry" },
+		{ label: "Drama", value: "drama" },
+		{ label: "Classic", value: "classic" },
 		{ label: "Unknown", value: "unknown" },
 	];
 
@@ -192,6 +203,21 @@ export default function BookFormScreen({ route, navigation }) {
 			headerBackVisible: false,
 		});
 	}, [navigation]);
+
+	// Sync genres when the component mounts
+	useEffect(() => {
+		syncGenresWithBackend(GENRE_CHOICES).then(() => {
+			console.log("Genre synchronization attempted");
+		});
+		
+		// Also consider loading genres from backend:
+		// fetchGenresFromBackend().then(backendGenres => {
+		//   if (backendGenres && backendGenres.length > 0) {
+		//     // Use backend genres instead of hardcoded ones
+		//     setDynamicGenreChoices(backendGenres);
+		//   }
+		// });
+	}, []);
 
 	// Search books from OpenLibrary API
 	const searchBooks = async (query) => {
@@ -921,7 +947,7 @@ export default function BookFormScreen({ route, navigation }) {
 		}
 	};
 
-	// SIMPLIFIED: Handle the form submission with clearer image handling
+	// UPDATED: Handle the form submission with improved error handling
 	const handleSubmit = async () => {
 		if (!title || !author) {
 			Alert.alert("Title and author are required fields.");
@@ -936,13 +962,18 @@ export default function BookFormScreen({ route, navigation }) {
 			// Add all the basic book information
 			formData.append("title", title);
 			formData.append("author", author);
-			formData.append(
-				"genre",
-				genres && genres.length > 0 ? genres[0] : "unknown"
-			);
+
+			// Handle genre - ensure it's a string, not an array
+			if (genres && genres.length > 0) {
+				formData.append("genre", genres[0]);
+			} else {
+				formData.append("genre", "unknown");
+			}
+
+			// ISBN is optional
 			formData.append("isbn", "");
 
-			// Format the book notes
+			// Format the book notes with improved handling
 			let combinedNotes = "";
 			if (vibes && thoughts) {
 				combinedNotes = `${vibes}--VIBES_SEPARATOR--${thoughts}`;
@@ -953,91 +984,124 @@ export default function BookFormScreen({ route, navigation }) {
 			}
 			formData.append("book_notes", combinedNotes);
 
-			// Add numeric values
-			formData.append("rating", (parseFloat(rating) || 0).toFixed(2));
+			// Ensure rating is properly formatted and valid
+			const ratingValue = parseFloat(rating);
+			if (!isNaN(ratingValue)) {
+				formData.append("rating", ratingValue.toFixed(2));
+			} else {
+				formData.append("rating", "0.00");
+			}
 
-			// Add boolean values
+			// Add boolean values - convert to string format expected by Django
 			formData.append("is_read", isRead ? "true" : "false");
 			formData.append("toBeRead", toBeRead ? "true" : "false");
 			formData.append("shelved", shelved ? "true" : "false");
 
-			// Add date
+			// Format date as YYYY-MM-DD for Django
 			const dateObj = new Date(publicationYear, 0, 1);
 			const formattedDate = dateObj.toISOString().split("T")[0];
 			formData.append("publication_date", formattedDate);
 
-			// Add tags and warnings
-			formData.append("tags", tags ? tags.substring(0, 255) : "");
-			formData.append("content_warnings", contentWarnings || "");
-			formData.append("emoji", emoji || "📚");
-
-			// SIMPLIFIED: Handle cover image - only for user uploads
-			if (coverImage && !coverImage.canceled) {
-				let uri;
-
-				// Handle image picker result format
-				if (coverImage.assets && coverImage.assets.length > 0) {
-					uri = coverImage.assets[0].uri;
-				} else if (coverImage.uri) {
-					uri = coverImage.uri;
-				}
-
-				if (uri) {
-					const fileName = uri.split("/").pop() || "cover.jpg";
-					const match = /\.(\w+)$/.exec(fileName);
-					const fileType = match ? `image/${match[1]}` : "image/jpeg";
-
-					formData.append("cover", {
-						uri,
-						name: fileName,
-						type: fileType,
-					});
-					console.log(`Adding image: ${fileName}`);
-				}
+			// Add tags and warnings with proper validation
+			if (tags) {
+				formData.append("tags", tags.substring(0, 255));
 			}
 
-			// Determine the API endpoint
-			const url = editingBook
+			if (contentWarnings) {
+				formData.append("content_warnings", contentWarnings);
+			}
+
+			formData.append("emoji", emoji || "📚");			
+			// Determine the API endpoint with proper trailing slash
+			let url = editingBook
 				? `${API_BASE_URL}/books/${editingBook.id}/`
 				: `${API_BASE_URL}/books/`;
+
+			// Ensure URL has trailing slash for Django
+			if (!url.endsWith("/")) {
+				url += "/";
+			}
 
 			const method = editingBook ? "PUT" : "POST";
 			console.log(`Submitting to ${method} ${url}`);
 
-			// Submit the form
+			// Debug the form data
+			console.log("Form data entries:");
+			for (let [key, value] of formData._parts) {
+				if (typeof value === "object" && !Array.isArray(value)) {
+					console.log(`${key}: [Complex Object]`);
+				} else {
+					console.log(`${key}: ${value}`);
+				}
+			}
+
+			// Submit the form with proper headers
 			const response = await fetch(url, {
 				method: method,
 				body: formData,
 				headers: {
+					// Don't set Content-Type header when sending FormData
+					// React Native will set it automatically with the boundary
 					Accept: "application/json",
 				},
 			});
 
+			console.log("Response status:", response.status);
+
+			// Enhanced error handling
 			if (response.ok) {
 				const data = await response.json();
 				console.log("Book saved successfully:", data);
 				Alert.alert("Success", "Book saved successfully!");
 				navigation.navigate("BookListScreen", { refresh: Date.now() });
 			} else {
-				// Handle error response
+				// More detailed error handling
 				let errorText = "";
+				let errorDetails = {};
+
+				// Try to get JSON error first
 				try {
-					const errorData = await response.json();
-					errorText = JSON.stringify(errorData);
+					errorDetails = await response.json();
+					errorText = JSON.stringify(errorDetails);
+					console.error("Server returned error:", errorDetails);
 				} catch (e) {
+					// If not JSON, get text
 					try {
 						errorText = await response.text();
+						console.error("Server returned text error:", errorText);
 					} catch (e2) {
 						errorText = "Unknown error";
 					}
 				}
-				throw new Error(`Server error (${response.status}): ${errorText}`);
+
+				// Create a more informative error message
+				let errorMessage = `Server error (${response.status})`;
+
+				// If we have field-specific errors, display them
+				if (errorDetails && typeof errorDetails === "object") {
+					const fieldErrors = Object.entries(errorDetails)
+						.map(
+							([field, errors]) =>
+								`${field}: ${
+									Array.isArray(errors) ? errors.join(", ") : errors
+								}`
+						)
+						.join("\n");
+
+					if (fieldErrors) {
+						errorMessage += `\n\nField errors:\n${fieldErrors}`;
+					}
+				} else if (errorText) {
+					errorMessage += `\n\n${errorText}`;
+				}
+
+				throw new Error(errorMessage);
 			}
 		} catch (error) {
 			console.error("Error saving book:", error);
 			Alert.alert(
 				"Error Saving Book",
-				`There was a problem saving the book: ${error.message}`
+				`There was a problem saving the book:\n\n${error.message}`
 			);
 		} finally {
 			setUploading(false);
@@ -1091,17 +1155,6 @@ export default function BookFormScreen({ route, navigation }) {
 								activeOpacity={0.7}
 							>
 								<View style={styles.searchResultContent}>
-									{item.coverId ? (
-										<Image
-											source={{ uri: `${COVER_API_BASE}${item.coverId}-M.jpg` }}
-											style={styles.resultThumbnail}
-											resizeMode="contain"
-										/>
-									) : (
-										<View style={styles.noThumbnail}>
-											<Text style={styles.noThumbnailText}>No Cover</Text>
-										</View>
-									)}
 									<View style={styles.resultTextContainer}>
 										<Text style={styles.resultTitle} numberOfLines={2}>
 											{item.title}
