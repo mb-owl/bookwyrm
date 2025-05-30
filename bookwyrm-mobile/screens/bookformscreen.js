@@ -181,26 +181,54 @@ export default function BookFormScreen({ route, navigation }) {
 		})();
 	}, []);
 
-	// Genre selection logic - improved to handle empty states and defaults
+	// Genre selection logic - fixed to correctly load all genres when editing
 	useEffect(() => {
 		try {
-			if (editingBook && editingBook.genre) {
+			if (editingBook) {
 				let initialGenres = [];
 
-				// Handle case where genre is a string (needs splitting)
-				if (typeof editingBook.genre === "string") {
-					initialGenres = editingBook.genre
-						.split(",")
-						.map((g) => g.trim())
-						.filter((g) => g.length > 0);
+				// First, add the primary genre if it exists
+				if (editingBook.genre && editingBook.genre !== "unknown") {
+					initialGenres.push(editingBook.genre);
+					console.log("Added primary genre:", editingBook.genre);
 				}
-				// Handle case where genre is already an array
-				else if (Array.isArray(editingBook.genre)) {
-					initialGenres = editingBook.genre.filter((g) => g && g.length > 0);
+
+				// Then, process additional genres if they exist
+				if (editingBook.additional_genres) {
+					console.log(
+						"Processing additional_genres:",
+						editingBook.additional_genres
+					);
+
+					// Handle case where additional_genres is a string (comma-separated)
+					if (typeof editingBook.additional_genres === "string") {
+						const additionalGenreArray = editingBook.additional_genres
+							.split(",")
+							.map((g) => g.trim())
+							.filter((g) => g && g.length > 0 && g !== "unknown");
+
+						console.log("Found additional genres:", additionalGenreArray);
+						initialGenres = [...initialGenres, ...additionalGenreArray];
+					}
+					// Handle case where additional_genres is already an array
+					else if (Array.isArray(editingBook.additional_genres)) {
+						const additionalGenreArray = editingBook.additional_genres.filter(
+							(g) => g && g !== "unknown"
+						);
+
+						initialGenres = [...initialGenres, ...additionalGenreArray];
+					}
 				}
+
+				// Remove duplicates
+				initialGenres = [...new Set(initialGenres)];
 
 				// Use valid genres or fall back to "unknown"
 				setGenres(initialGenres.length > 0 ? initialGenres : ["unknown"]);
+				console.log(
+					"Initial genres set to:",
+					initialGenres.length > 0 ? initialGenres : ["unknown"]
+				);
 			} else {
 				// Default to "unknown" for new books
 				setGenres(["unknown"]);

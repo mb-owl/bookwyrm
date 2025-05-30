@@ -104,6 +104,7 @@ export default function BookDetailScreen({ route, navigation }) {
 			}
 
 			const data = await response.json();
+			console.log("Received book data:", JSON.stringify(data, null, 2));
 			setBook(data);
 		} catch (err) {
 			console.error("Error fetching book details:", err);
@@ -178,7 +179,18 @@ export default function BookDetailScreen({ route, navigation }) {
 
 	// Navigate to edit screen
 	const handleEdit = () => {
-		navigation.navigate("BookFormScreen", { book });
+		// Make sure all genre information is included when navigating to edit
+		const bookWithAllGenres = { ...book };
+
+		// Ensure additional_genres is properly formatted for the edit screen
+		if (
+			bookWithAllGenres.additional_genres === null ||
+			bookWithAllGenres.additional_genres === undefined
+		) {
+			bookWithAllGenres.additional_genres = "";
+		}
+
+		navigation.navigate("BookFormScreen", { book: bookWithAllGenres });
 	};
 
 	// Render field with label
@@ -202,10 +214,12 @@ export default function BookDetailScreen({ route, navigation }) {
 		);
 	};
 
-	// New function to render genres (primary + additional)
+	// Completely rewritten function to render genres properly
 	const renderGenres = () => {
 		// Get genre display name instead of code
 		const getGenreDisplayName = (code) => {
+			if (!code) return null;
+
 			// Map of common genre codes to display names
 			const genreMap = {
 				fiction: "Fiction",
@@ -231,14 +245,57 @@ export default function BookDetailScreen({ route, navigation }) {
 				unknown: "Unknown",
 			};
 
-			return genreMap[code] || code;
+			// Clean up the code and return the display name or the original code
+			const trimmedCode = String(code).trim().toLowerCase();
+			return genreMap[trimmedCode] || code;
 		};
 
-		// Handle empty genre
-		if (
-			!book.genre &&
-			(!book.additional_genres || book.additional_genres.length === 0)
-		) {
+		// Collect all genres in a unified array
+		let allGenres = [];
+
+		// 1. Add primary genre if valid
+		if (book.genre && book.genre !== "unknown") {
+			allGenres.push(getGenreDisplayName(book.genre));
+		}
+
+		// 2. Process additional genres - with improved handling for different formats and NULL checks
+		if (book.additional_genres) {
+			try {
+				// Process as string (most common format from backend)
+				if (typeof book.additional_genres === "string") {
+					// Handle empty string case
+					if (book.additional_genres.trim() === "") {
+						// Skip empty strings
+					} else {
+						const additionalGenreArray = book.additional_genres
+							.split(",")
+							.map((g) => g.trim())
+							.filter((g) => g && g.length > 0 && g !== "unknown")
+							.map(getGenreDisplayName)
+							.filter((g) => g);
+
+						allGenres = [...allGenres, ...additionalGenreArray];
+					}
+				}
+				// Handle array format (less common but possible)
+				else if (Array.isArray(book.additional_genres)) {
+					const additionalGenreArray = book.additional_genres
+						.filter((g) => g && g !== "unknown")
+						.map(getGenreDisplayName)
+						.filter((g) => g);
+
+					allGenres = [...allGenres, ...additionalGenreArray];
+				}
+			} catch (error) {
+				console.error("Error processing genres:", error);
+			}
+		}
+
+		// 3. Remove duplicates from the combined list
+		allGenres = [...new Set(allGenres)];
+
+		// 4. Handle the case when no valid genres are found
+		if (allGenres.length === 0) {
 			return (
 				<View style={baseStyles.fieldContainer}>
 					<Text style={[baseStyles.fieldLabel, baseStyles.emptyFieldLabel]}>
@@ -251,35 +308,14 @@ export default function BookDetailScreen({ route, navigation }) {
 			);
 		}
 
-		// Start with primary genre
-		let genreList = [];
-		if (book.genre && book.genre !== "unknown") {
-			genreList.push(getGenreDisplayName(book.genre));
-		}
-
-		// Add additional genres if they exist
-		if (book.additional_genres) {
-			// Parse comma-separated list of additional genres
-			const additionalGenres = book.additional_genres
-				.split(",")
-				.map((g) => g.trim())
-				.filter((g) => g.length > 0 && g !== "unknown")
-				.map(getGenreDisplayName);
-
-			genreList = [...genreList, ...additionalGenres];
-		}
-
-		// Ensure we don't have duplicates
-		genreList = [...new Set(genreList)];
-
-		// Return formatted genre list
+		// 5. Display all genres
 		return (
 			<View style={baseStyles.fieldContainer}>
 				<Text style={baseStyles.fieldLabel}>
-					{genreList.length > 1 ? "Genres:" : "Genre:"}
+					{allGenres.length > 1 ? "Genres:" : "Genre:"}
 				</Text>
 				<View style={bookStyles.genreContainer}>
-					{genreList.map((genre, index) => (
+					{allGenres.map((genre, index) => (
 						<View key={index} style={bookStyles.genreBadge}>
 							<Text style={bookStyles.genreBadgeText}>{genre}</Text>
 						</View>
@@ -354,6 +390,10 @@ export default function BookDetailScreen({ route, navigation }) {
 	}
 
 	const { vibes, thoughts } = extractVibesAndThoughts(book.book_notes);
+
+	// Add safe checks for book photo array
+	const safeBookPhotos = book.myBookPhotos || [];
+	const hasPhotos = Array.isArray(safeBookPhotos) && safeBookPhotos.length > 0;
 
 	return (
 		<ScrollView
@@ -662,13 +702,13 @@ export default function BookDetailScreen({ route, navigation }) {
 			</Animated.View>
 
 			{/* Add Me and My Books section - after the primary details */}
-			{book.myBookPhotos && book.myBookPhotos.length > 0 && (
+			{hasPhotos && (
 				<View style={baseStyles.sectionContainer}>
 					<Text style={baseStyles.sectionTitle}>Me and My Books</Text>
 					<View style={baseStyles.sectionDivider} />
 
 					<View style={bookStyles.photoGallery}>
-						{book.myBookPhotos.map((photo, index) => (
+						{safeBookPhotos.map((photo, index) => (
 							<TouchableOpacity
 								key={index}
 								style={bookStyles.photoContainer}
@@ -706,12 +746,12 @@ export default function BookDetailScreen({ route, navigation }) {
 						<Text style={bookStyles.closeButtonText}>×</Text>
 					</TouchableOpacity>
 
-					{book.myBookPhotos && book.myBookPhotos.length > 0 && (
+					{hasPhotos && (
 						<Image
 							source={{
 								uri:
-									book.myBookPhotos[selectedPhotoIndex].uri ||
-									`${getMediaUrl()}book_photos/${book.myBookPhotos[
+									safeBookPhotos[selectedPhotoIndex].uri ||
+									`${getMediaUrl()}book_photos/${safeBookPhotos[
 										selectedPhotoIndex
 									]
 										.split("/")
@@ -738,21 +778,21 @@ export default function BookDetailScreen({ route, navigation }) {
 						</TouchableOpacity>
 
 						<Text style={bookStyles.photoCounter}>
-							{selectedPhotoIndex + 1} / {book.myBookPhotos.length}
+							{selectedPhotoIndex + 1} / {safeBookPhotos.length}
 						</Text>
 
 						<TouchableOpacity
 							style={[
 								bookStyles.photoNavButton,
-								selectedPhotoIndex === book.myBookPhotos.length - 1 &&
+								selectedPhotoIndex === safeBookPhotos.length - 1 &&
 									bookStyles.disabledNavButton,
 							]}
 							onPress={() =>
 								setSelectedPhotoIndex(
-									Math.min(book.myBookPhotos.length - 1, selectedPhotoIndex + 1)
+									Math.min(safeBookPhotos.length - 1, selectedPhotoIndex + 1)
 								)
 							}
-							disabled={selectedPhotoIndex === book.myBookPhotos.length - 1}
+							disabled={selectedPhotoIndex === safeBookPhotos.length - 1}
 						>
 							<Text style={bookStyles.photoNavButtonText}>→</Text>
 						</TouchableOpacity>
