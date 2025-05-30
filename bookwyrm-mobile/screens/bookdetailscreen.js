@@ -40,9 +40,16 @@ export default function BookDetailScreen({ route, navigation }) {
 
 	// Add this to ensure our custom header is respected
 	useEffect(() => {
-		// This prevents the default back behavior from overriding our custom header
+		// Add home button to the header
 		navigation.setOptions({
-			headerBackVisible: false,
+			headerLeft: () => (
+				<TouchableOpacity
+					style={styles.homeButton}
+					onPress={() => navigation.navigate("WelcomeScreen")}
+				>
+					<Text style={styles.homeButtonText}>🏠</Text>
+				</TouchableOpacity>
+			),
 		});
 	}, [navigation]);
 
@@ -680,5 +687,11 @@ const styles = StyleSheet.create({
 	warningText: {
 		color: "#c62828",
 		fontSize: 14,
+	},
+	homeButton: {
+		padding: 10,
+	},
+	homeButtonText: {
+		fontSize: 20,
 	},
 });

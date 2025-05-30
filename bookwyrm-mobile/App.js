@@ -7,6 +7,7 @@ import { Alert, Platform, TouchableOpacity, Text } from "react-native";
 import { API_BASE_URL } from "./utils/apiConfig";
 
 //screens
+import WelcomeScreen from "./screens/welcome";
 import booklistscreen from "./screens/booklistscreen";
 import bookdetailscreen from "./screens/bookdetailscreen";
 import bookformscreen from "./screens/bookformscreen";
@@ -50,42 +51,29 @@ export default function App() {
 	}, []);
 
 	// Custom back button that navigates to HoME instead of previous screen
-	const customBackButton = (navigation) => {
-		return (
-			<TouchableOpacity
-				onPress={() => {
-					// This would ideally navigate to the HoME screen
-					// For now, navigate to BookListScreen as a placeholder
-					navigation.navigate("BookListScreen");
-
-					// If you have an actual HoME screen, uncomment this:
-					// navigation.navigate("HoMEScreen");
-				}}
-				style={{ marginLeft: 10 }}
-			>
-				<Text style={{ color: "#007AFF", fontSize: 16 }}>HoME</Text>
-			</TouchableOpacity>
-		);
-	};
 
 	return (
 		<NavigationContainer>
 			<Stack.Navigator
-				initialRouteName="BookListScreen"
+				initialRouteName="WelcomeScreen"
 				screenOptions={({ navigation }) => ({
 					// This provides the custom back button for all screens
-					headerLeft: () => customBackButton(navigation),
-					// Disable the default back gesture and button
 					gestureEnabled: false,
 				})}
 			>
+				<Stack.Screen
+					name="WelcomeScreen"
+					component={WelcomeScreen}
+					options={{
+						title: "Welcome to BookWyrm",
+						headerShown: false, // Hide header for welcome screen
+					}}
+				/>
 				<Stack.Screen
 					name="BookListScreen"
 					component={booklistscreen}
 					options={{
 						title: "Book List",
-						// For the initial screen, we might not want a back button
-						headerLeft: () => null,
 					}}
 				/>
 				<Stack.Screen

@@ -33,9 +33,16 @@ export default function BookListScreen({ route, navigation }) {
 
 	// Add this to ensure our custom header is respected
 	useEffect(() => {
-		// Since this is typically the first screen, we might not need a back button at all
+		// Add home button to the header
 		navigation.setOptions({
-			headerLeft: () => null,
+			headerLeft: () => (
+				<TouchableOpacity
+					style={styles.homeButton}
+					onPress={() => navigation.navigate("WelcomeScreen")}
+				>
+					<Text style={styles.homeButtonText}>🏠</Text>
+				</TouchableOpacity>
+			),
 		});
 	}, [navigation]);
 
@@ -1176,5 +1183,11 @@ const styles = StyleSheet.create({
 		color: "#fff",
 		fontSize: 16,
 		fontWeight: "500",
+	},
+	homeButton: {
+		padding: 10,
+	},
+	homeButtonText: {
+		fontSize: 20,
 	},
 });
