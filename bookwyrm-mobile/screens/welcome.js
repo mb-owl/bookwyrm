@@ -124,105 +124,105 @@ export default function WelcomeScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "#fff",
-		padding: 20,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	header: {
-		alignItems: "center",
-		marginBottom: 40,
-	},
-	title: {
-		fontSize: 36,
-		fontWeight: "bold",
-		color: "#2c3e50",
-		marginBottom: 10,
-	},
-	subtitle: {
-		fontSize: 18,
-		color: "#7f8c8d",
-		textAlign: "center",
-	},
-	logoContainer: {
-		marginBottom: 40,
-	},
-	logo: {
-		width: 150,
-		height: 150,
-	},
-	buttonsContainer: {
-		width: "100%",
-		maxWidth: 300,
-	},
-	button: {
-		backgroundColor: "#3498db",
-		padding: 15,
-		borderRadius: 8,
-		alignItems: "center",
-		marginBottom: 15,
-	},
-	secondaryButton: {
-		backgroundColor: "#2ecc71",
-	},
-	buttonText: {
-		color: "#fff",
-		fontSize: 18,
-		fontWeight: "500",
-	},
-	versionText: {
-		position: "absolute",
-		bottom: 20,
-		color: "#95a5a6",
-		fontSize: 12,
-	},
-	// Hamburger menu styles
-	menuButton: {
-		position: "absolute",
-		top: 40,
-		left: 20,
-		zIndex: 100,
-		padding: 10,
-	},
-	menuButtonText: {
-		fontSize: 30,
-		color: "#2c3e50",
-	},
-	modalOverlay: {
-		flex: 1,
-		backgroundColor: "rgba(0,0,0,0.5)",
-	},
-	dropdownMenu: {
-		position: "absolute",
-		top: 80,
-		right: 20,
-		backgroundColor: "white",
-		borderRadius: 8,
-		paddingVertical: 8,
-		paddingHorizontal: 4,
-		width: 200,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.25,
-		shadowRadius: 3.84,
-		elevation: 5,
-	},
-	menuItem: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingVertical: 12,
-		paddingHorizontal: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: "#f0f0f0",
-	},
-	menuItemIcon: {
-		fontSize: 20,
-		marginRight: 12,
-	},
-	menuItemText: {
-		fontSize: 16,
-		color: "#2c3e50",
-	},
+    container: {
+        flex: 1,
+        backgroundColor: "#fff",
+        padding: 20,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    header: {
+        alignItems: "center",
+        marginBottom: 40,
+    },
+    title: {
+        fontSize: 36,
+        fontWeight: "bold",
+        color: "#2c3e50",
+        marginBottom: 10,
+    },
+    subtitle: {
+        fontSize: 18,
+        color: "#7f8c8d",
+        textAlign: "center",
+    },
+    logoContainer: {
+        marginBottom: 40,
+    },
+    logo: {
+        width: 150,
+        height: 150,
+    },
+    buttonsContainer: {
+        width: "100%",
+        maxWidth: 300,
+    },
+    button: {
+        backgroundColor: "#3498db",
+        padding: 15,
+        borderRadius: 8,
+        alignItems: "center",
+        marginBottom: 15,
+    },
+    secondaryButton: {
+        backgroundColor: "#2ecc71",
+    },
+    buttonText: {
+        color: "#fff",
+        fontSize: 18,
+        fontWeight: "500",
+    },
+    versionText: {
+        position: "absolute",
+        bottom: 20,
+        color: "#95a5a6",
+        fontSize: 12,
+    },
+    // Hamburger menu styles
+    menuButton: {
+        position: "absolute",
+        top: 40,
+        left: 20,
+        zIndex: 100,
+        padding: 10,
+    },
+    menuButtonText: {
+        fontSize: 30,
+        color: "#2c3e50",
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.5)",
+    },
+    dropdownMenu: {
+        position: "absolute",
+        top: 80,
+        left: 20,
+        backgroundColor: "white",
+        borderRadius: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 4,
+        width: 200,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
+    },
+    menuItem: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: "#f0f0f0",
+    },
+    menuItemIcon: {
+        fontSize: 20,
+        marginRight: 12,
+    },
+    menuItemText: {
+        fontSize: 16,
+        color: "#2c3e50",
+    },
 });

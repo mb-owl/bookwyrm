@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import {
 	View,
 	Text,
-	StyleSheet,
 	Image,
 	TouchableOpacity,
 	Alert,
@@ -11,9 +10,15 @@ import {
 	Animated,
 } from "react-native";
 
-// Import API configuration
+// Import API configuration and components
 import { API_BASE_URL, getMediaUrl } from "../utils/apiConfig";
 import HamburgerMenu from "../components/HamburgerMenu";
+
+// Import styles
+import baseStyles from "../styles/baseStyles";
+import bookStyles from "../styles/bookStyles";
+import buttonStyles from "../styles/buttonStyles";
+import { colors } from "../styles/theme";
 
 export default function BookDetailScreen({ route, navigation }) {
 	const { book: initialBook, bookId } = route.params; // Get book object or ID from navigation
@@ -46,10 +51,10 @@ export default function BookDetailScreen({ route, navigation }) {
 			headerLeft: () => <HamburgerMenu />,
 			headerRight: () => (
 				<TouchableOpacity
-					style={styles.backButton}
+					style={buttonStyles.backButton}
 					onPress={() => navigation.goBack()}
 				>
-					<Text style={styles.backButtonText}>↩ Back</Text>
+					<Text style={buttonStyles.backButtonText}>↩ Back</Text>
 				</TouchableOpacity>
 			),
 		});
@@ -177,11 +182,15 @@ export default function BookDetailScreen({ route, navigation }) {
 		const displayValue = isEmpty ? "Not specified" : formatter(value);
 
 		return (
-			<View style={styles.fieldContainer}>
-				<Text style={[styles.fieldLabel, isEmpty && styles.emptyFieldLabel]}>
+			<View style={baseStyles.fieldContainer}>
+				<Text
+					style={[baseStyles.fieldLabel, isEmpty && baseStyles.emptyFieldLabel]}
+				>
 					{label}:
 				</Text>
-				<Text style={[styles.fieldValue, isEmpty && styles.emptyFieldValue]}>
+				<Text
+					style={[baseStyles.fieldValue, isEmpty && baseStyles.emptyFieldValue]}
+				>
 					{displayValue}
 				</Text>
 			</View>
@@ -203,9 +212,9 @@ export default function BookDetailScreen({ route, navigation }) {
 			"☆".repeat(Math.max(0, 5 - Math.floor(numericRating)));
 
 		return (
-			<View style={styles.fieldContainer}>
-				<Text style={styles.fieldLabel}>{label}:</Text>
-				<Text style={styles.fieldValue}>
+			<View style={baseStyles.fieldContainer}>
+				<Text style={baseStyles.fieldLabel}>{label}:</Text>
+				<Text style={baseStyles.fieldValue}>
 					{stars} ({numericRating.toFixed(2)})
 				</Text>
 			</View>
@@ -215,9 +224,9 @@ export default function BookDetailScreen({ route, navigation }) {
 	// Show loading state
 	if (loading) {
 		return (
-			<View style={styles.loadingContainer}>
-				<ActivityIndicator size="large" color="#0000ff" />
-				<Text style={styles.loadingText}>Loading book details...</Text>
+			<View style={baseStyles.loadingContainer}>
+				<ActivityIndicator size="large" color={colors.primary} />
+				<Text style={baseStyles.loadingText}>Loading book details...</Text>
 			</View>
 		);
 	}
@@ -225,10 +234,13 @@ export default function BookDetailScreen({ route, navigation }) {
 	// Show error state
 	if (error) {
 		return (
-			<View style={styles.errorContainer}>
-				<Text style={styles.errorText}>Error: {error}</Text>
-				<TouchableOpacity style={styles.retryButton} onPress={fetchBookDetails}>
-					<Text style={styles.retryButtonText}>Retry</Text>
+			<View style={baseStyles.centeredContainer}>
+				<Text style={baseStyles.errorText}>Error: {error}</Text>
+				<TouchableOpacity
+					style={buttonStyles.primaryButton}
+					onPress={fetchBookDetails}
+				>
+					<Text style={buttonStyles.primaryButtonText}>Retry</Text>
 				</TouchableOpacity>
 			</View>
 		);
@@ -237,13 +249,13 @@ export default function BookDetailScreen({ route, navigation }) {
 	// If no book data available
 	if (!book) {
 		return (
-			<View style={styles.errorContainer}>
-				<Text style={styles.errorText}>Book not found</Text>
+			<View style={baseStyles.centeredContainer}>
+				<Text style={baseStyles.errorText}>Book not found</Text>
 				<TouchableOpacity
-					style={styles.backButton}
+					style={buttonStyles.primaryButton}
 					onPress={() => navigation.goBack()}
 				>
-					<Text style={styles.backButtonText}>Go Back</Text>
+					<Text style={buttonStyles.primaryButtonText}>Go Back</Text>
 				</TouchableOpacity>
 			</View>
 		);
@@ -252,9 +264,12 @@ export default function BookDetailScreen({ route, navigation }) {
 	const { vibes, thoughts } = extractVibesAndThoughts(book.book_notes);
 
 	return (
-		<ScrollView style={styles.container}>
+		<ScrollView
+			style={baseStyles.container}
+			contentContainerStyle={baseStyles.scrollViewContent}
+		>
 			{/* Book cover image */}
-			<View style={styles.coverContainer}>
+			<View style={bookStyles.coverContainer}>
 				{book.cover ? (
 					<Image
 						source={{
@@ -262,48 +277,54 @@ export default function BookDetailScreen({ route, navigation }) {
 								? book.cover
 								: `${getMediaUrl()}covers/${book.cover.split("/").pop()}`,
 						}}
-						style={styles.coverImage}
+						style={bookStyles.coverImage}
 						resizeMode="contain"
 					/>
 				) : (
-					<View style={styles.noCoverContainer}>
-						<Text style={styles.noCoverText}>No cover image</Text>
+					<View style={bookStyles.noCoverContainer}>
+						<Text style={bookStyles.noCoverText}>No cover image</Text>
 					</View>
 				)}
 			</View>
 
 			{/* Title and Author */}
-			<View style={styles.titleContainer}>
-				<Text style={styles.bookTitle}>{book.title}</Text>
-				<Text style={styles.bookAuthor}>by {book.author}</Text>
+			<View style={bookStyles.titleContainer}>
+				<Text style={bookStyles.bookTitleLarge}>{book.title}</Text>
+				<Text style={bookStyles.bookAuthorLarge}>by {book.author}</Text>
 
 				{/* Low profile action buttons - now below author name */}
-				<View style={styles.actionButtonsContainer}>
-					<TouchableOpacity style={styles.actionButton} onPress={handleEdit}>
-						<Text style={styles.actionButtonText}>Edit</Text>
+				<View style={baseStyles.row}>
+					<TouchableOpacity
+						style={buttonStyles.actionButton}
+						onPress={handleEdit}
+					>
+						<Text style={buttonStyles.actionButtonText}>Edit</Text>
 					</TouchableOpacity>
-					<TouchableOpacity style={styles.actionButton} onPress={handleDelete}>
-						<Text style={styles.actionButtonText}>Delete</Text>
+					<TouchableOpacity
+						style={buttonStyles.actionButton}
+						onPress={handleDelete}
+					>
+						<Text style={buttonStyles.actionButtonText}>Delete</Text>
 					</TouchableOpacity>
 				</View>
 			</View>
 
 			{/* Primary Details Section - MODIFIED to add favorite star */}
-			<View style={styles.sectionContainer}>
-				<View style={styles.sectionHeaderRow}>
-					<Text style={styles.sectionTitle}>Book Details</Text>
+			<View style={baseStyles.sectionContainer}>
+				<View style={baseStyles.sectionHeaderRow}>
+					<Text style={baseStyles.sectionTitle}>Book Details</Text>
 					{book && (
 						<TouchableOpacity
-							style={styles.sectionFavoriteButton}
+							style={buttonStyles.favoriteButton}
 							onPress={toggleFavorite}
 						>
-							<Text style={styles.favoriteButtonText}>
+							<Text style={buttonStyles.favoriteButtonText}>
 								{book.favorite ? "⭐" : "☆"}
 							</Text>
 						</TouchableOpacity>
 					)}
 				</View>
-				<View style={styles.sectionDivider} />
+				<View style={baseStyles.sectionDivider} />
 
 				{renderField("Genre", book.genre)}
 				{renderField(
@@ -315,21 +336,21 @@ export default function BookDetailScreen({ route, navigation }) {
 			</View>
 
 			{/* Reading Status Section */}
-			<View style={styles.sectionContainer}>
-				<Text style={styles.sectionTitle}>Reading Status</Text>
-				<View style={styles.sectionDivider} />
+			<View style={baseStyles.sectionContainer}>
+				<Text style={baseStyles.sectionTitle}>Reading Status</Text>
+				<View style={baseStyles.sectionDivider} />
 
-				<View style={styles.statusContainer}>
+				<View style={bookStyles.statusContainer}>
 					<View
 						style={[
-							styles.statusBadge,
-							book.is_read && styles.activeStatusBadge,
+							bookStyles.statusBadge,
+							book.is_read && bookStyles.activeStatusBadge,
 						]}
 					>
 						<Text
 							style={[
-								styles.statusText,
-								book.is_read && styles.activeStatusText,
+								bookStyles.statusText,
+								book.is_read && bookStyles.activeStatusText,
 							]}
 						>
 							{book.is_read ? "Read" : "Unread"}
@@ -338,14 +359,14 @@ export default function BookDetailScreen({ route, navigation }) {
 
 					<View
 						style={[
-							styles.statusBadge,
-							book.toBeRead && styles.activeStatusBadge,
+							bookStyles.statusBadge,
+							book.toBeRead && bookStyles.activeStatusBadge,
 						]}
 					>
 						<Text
 							style={[
-								styles.statusText,
-								book.toBeRead && styles.activeStatusText,
+								bookStyles.statusText,
+								book.toBeRead && bookStyles.activeStatusText,
 							]}
 						>
 							{book.toBeRead ? "To Be Read" : "Not on TBR"}
@@ -354,14 +375,14 @@ export default function BookDetailScreen({ route, navigation }) {
 
 					<View
 						style={[
-							styles.statusBadge,
-							book.shelved && styles.activeStatusBadge,
+							bookStyles.statusBadge,
+							book.shelved && bookStyles.activeStatusBadge,
 						]}
 					>
 						<Text
 							style={[
-								styles.statusText,
-								book.shelved && styles.activeStatusText,
+								bookStyles.statusText,
+								book.shelved && bookStyles.activeStatusText,
 							]}
 						>
 							{book.shelved ? "On Shelf" : "Not on Shelf"}
@@ -371,14 +392,14 @@ export default function BookDetailScreen({ route, navigation }) {
 					{/* New status badges */}
 					<View
 						style={[
-							styles.statusBadge,
-							book.currently_reading && styles.activeStatusBadge,
+							bookStyles.statusBadge,
+							book.currently_reading && bookStyles.activeStatusBadge,
 						]}
 					>
 						<Text
 							style={[
-								styles.statusText,
-								book.currently_reading && styles.activeStatusText,
+								bookStyles.statusText,
+								book.currently_reading && bookStyles.activeStatusText,
 							]}
 						>
 							{book.currently_reading ? "Currently Reading" : "Not Reading"}
@@ -387,14 +408,14 @@ export default function BookDetailScreen({ route, navigation }) {
 
 					<View
 						style={[
-							styles.statusBadge,
-							book.did_not_finish && styles.activeStatusBadge,
+							bookStyles.statusBadge,
+							book.did_not_finish && bookStyles.activeStatusBadge,
 						]}
 					>
 						<Text
 							style={[
-								styles.statusText,
-								book.did_not_finish && styles.activeStatusText,
+								bookStyles.statusText,
+								book.did_not_finish && bookStyles.activeStatusText,
 							]}
 						>
 							{book.did_not_finish ? "Did Not Finish" : "Completed"}
@@ -403,14 +424,14 @@ export default function BookDetailScreen({ route, navigation }) {
 
 					<View
 						style={[
-							styles.statusBadge,
-							book.recommended_to_me && styles.activeStatusBadge,
+							bookStyles.statusBadge,
+							book.recommended_to_me && bookStyles.activeStatusBadge,
 						]}
 					>
 						<Text
 							style={[
-								styles.statusText,
-								book.recommended_to_me && styles.activeStatusText,
+								bookStyles.statusText,
+								book.recommended_to_me && bookStyles.activeStatusText,
 							]}
 						>
 							{book.recommended_to_me ? "Recommended" : "Not Recommended"}
@@ -418,10 +439,16 @@ export default function BookDetailScreen({ route, navigation }) {
 					</View>
 
 					<View
-						style={[styles.statusBadge, book.favorite && styles.favoriteBadge]}
+						style={[
+							bookStyles.statusBadge,
+							book.favorite && bookStyles.favoriteBadge,
+						]}
 					>
 						<Text
-							style={[styles.statusText, book.favorite && styles.favoriteText]}
+							style={[
+								bookStyles.statusText,
+								book.favorite && bookStyles.favoriteText,
+							]}
 						>
 							{book.favorite ? "⭐ Favorite" : "Not Favorite"}
 						</Text>
@@ -431,9 +458,9 @@ export default function BookDetailScreen({ route, navigation }) {
 
 			{/* Conditional Rating Section - only if book is read */}
 			{book.is_read && (
-				<View style={styles.sectionContainer}>
-					<Text style={styles.sectionTitle}>Rating & Impressions</Text>
-					<View style={styles.sectionDivider} />
+				<View style={baseStyles.sectionContainer}>
+					<Text style={baseStyles.sectionTitle}>Rating & Impressions</Text>
+					<View style={baseStyles.sectionDivider} />
 
 					{renderRatingField("Rating", book.rating)}
 					{renderField("Emoji", book.emoji || "📚")}
@@ -442,21 +469,21 @@ export default function BookDetailScreen({ route, navigation }) {
 
 			{/* Content Section - always display if there's content */}
 			{(vibes || thoughts) && (
-				<View style={styles.sectionContainer}>
-					<Text style={styles.sectionTitle}>Content</Text>
-					<View style={styles.sectionDivider} />
+				<View style={baseStyles.sectionContainer}>
+					<Text style={baseStyles.sectionTitle}>Content</Text>
+					<View style={baseStyles.sectionDivider} />
 
 					{vibes && (
-						<View style={styles.fieldContainer}>
-							<Text style={styles.fieldLabel}>Vibes:</Text>
-							<Text style={styles.fieldValue}>{vibes}</Text>
+						<View style={baseStyles.fieldContainer}>
+							<Text style={baseStyles.fieldLabel}>Vibes:</Text>
+							<Text style={baseStyles.fieldValue}>{vibes}</Text>
 						</View>
 					)}
 
 					{thoughts && (
-						<View style={styles.fieldContainer}>
-							<Text style={styles.fieldLabel}>My Thoughts:</Text>
-							<Text style={styles.fieldValue}>{thoughts}</Text>
+						<View style={baseStyles.fieldContainer}>
+							<Text style={baseStyles.fieldLabel}>My Thoughts:</Text>
+							<Text style={baseStyles.fieldValue}>{thoughts}</Text>
 						</View>
 					)}
 				</View>
@@ -464,15 +491,15 @@ export default function BookDetailScreen({ route, navigation }) {
 
 			{/* Deeper Look button */}
 			<TouchableOpacity
-				style={styles.deeperLookButton}
+				style={bookStyles.deeperLookButton}
 				onPress={toggleDeeperDetails}
 			>
-				<Text style={styles.deeperLookButtonText}>
+				<Text style={bookStyles.deeperLookButtonText}>
 					{showDeeperDetails
 						? "Hide Detailed Information"
 						: "Take a Deeper Look"}
 				</Text>
-				<Text style={styles.deeperLookIcon}>
+				<Text style={bookStyles.deeperLookIcon}>
 					{showDeeperDetails ? "▲" : "▼"}
 				</Text>
 			</TouchableOpacity>
@@ -480,7 +507,7 @@ export default function BookDetailScreen({ route, navigation }) {
 			{/* Collapsible "Deeper Look" sections */}
 			<Animated.View
 				style={[
-					styles.deeperDetailsContainer,
+					bookStyles.deeperDetailsContainer,
 					{
 						maxHeight: detailsAnimation.interpolate({
 							inputRange: [0, 1],
@@ -491,9 +518,9 @@ export default function BookDetailScreen({ route, navigation }) {
 				]}
 			>
 				{/* Publication Details Section */}
-				<View style={styles.deeperSectionContainer}>
-					<Text style={styles.deeperSectionTitle}>Publication Details</Text>
-					<View style={styles.sectionDivider} />
+				<View style={bookStyles.deeperSectionContainer}>
+					<Text style={bookStyles.deeperSectionTitle}>Publication Details</Text>
+					<View style={baseStyles.sectionDivider} />
 
 					{renderField("Publisher", book.publisher)}
 					{renderField("ISBN", book.isbn)}
@@ -502,17 +529,17 @@ export default function BookDetailScreen({ route, navigation }) {
 				</View>
 
 				{/* Tags Section */}
-				<View style={styles.deeperSectionContainer}>
-					<Text style={styles.deeperSectionTitle}>Tags & Categories</Text>
-					<View style={styles.sectionDivider} />
+				<View style={bookStyles.deeperSectionContainer}>
+					<Text style={bookStyles.deeperSectionTitle}>Tags & Categories</Text>
+					<View style={baseStyles.sectionDivider} />
 
 					{renderField("Tags", book.tags)}
 				</View>
 
 				{/* System Information Section */}
-				<View style={styles.deeperSectionContainer}>
-					<Text style={styles.deeperSectionTitle}>System Information</Text>
-					<View style={styles.sectionDivider} />
+				<View style={bookStyles.deeperSectionContainer}>
+					<Text style={bookStyles.deeperSectionTitle}>System Information</Text>
+					<View style={baseStyles.sectionDivider} />
 
 					{renderField("Created", book.created_at, formatDate)}
 					{renderField("Last Updated", book.updated_at, formatDate)}
@@ -521,16 +548,18 @@ export default function BookDetailScreen({ route, navigation }) {
 
 				{/* Content Warnings Section - if present */}
 				{book.content_warnings && (
-					<View style={styles.deeperSectionContainer}>
-						<Text style={[styles.deeperSectionTitle, styles.warningTitle]}>
+					<View style={bookStyles.deeperSectionContainer}>
+						<Text
+							style={[bookStyles.deeperSectionTitle, bookStyles.warningTitle]}
+						>
 							Content Warnings
 						</Text>
-						<View style={styles.sectionDivider} />
+						<View style={baseStyles.sectionDivider} />
 
-						<View style={styles.warningContainer}>
+						<View style={bookStyles.warningContainer}>
 							{book.content_warnings.split(",").map((warning, index) => (
-								<View key={index} style={styles.warningBadge}>
-									<Text style={styles.warningText}>{warning.trim()}</Text>
+								<View key={index} style={bookStyles.warningBadge}>
+									<Text style={bookStyles.warningText}>{warning.trim()}</Text>
 								</View>
 							))}
 						</View>
@@ -539,296 +568,7 @@ export default function BookDetailScreen({ route, navigation }) {
 			</Animated.View>
 
 			{/* Bottom spacer */}
-			<View style={styles.bottomSpacer} />
+			<View style={baseStyles.bottomSpacer} />
 		</ScrollView>
 	);
 }
-
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "#fff",
-		padding: 16,
-	},
-	loadingContainer: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-		backgroundColor: "#fff",
-	},
-	loadingText: {
-		marginTop: 16,
-		fontSize: 16,
-		color: "#666",
-	},
-	errorContainer: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-		backgroundColor: "#fff",
-		padding: 20,
-	},
-	errorText: {
-		fontSize: 16,
-		color: "#e74c3c",
-		marginBottom: 20,
-		textAlign: "center",
-	},
-	retryButton: {
-		backgroundColor: "#3498db",
-		paddingVertical: 10,
-		paddingHorizontal: 20,
-		borderRadius: 5,
-	},
-	retryButtonText: {
-		color: "#fff",
-		fontSize: 16,
-	},
-	backButton: {
-		backgroundColor: "#3498db",
-		paddingVertical: 10,
-		paddingHorizontal: 20,
-		borderRadius: 5,
-	},
-	backButtonText: {
-		color: "#fff",
-		fontSize: 16,
-	},
-	coverContainer: {
-		alignItems: "center",
-		marginVertical: 20,
-	},
-	coverImage: {
-		width: 200,
-		height: 300,
-		borderRadius: 10,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.2,
-		shadowRadius: 3,
-	},
-	noCoverContainer: {
-		width: 200,
-		height: 300,
-		borderRadius: 10,
-		backgroundColor: "#f0f0f0",
-		justifyContent: "center",
-		alignItems: "center",
-		borderWidth: 1,
-		borderColor: "#ddd",
-	},
-	noCoverText: {
-		color: "#999",
-		fontSize: 16,
-		fontStyle: "italic",
-	},
-	titleContainer: {
-		alignItems: "center",
-		marginBottom: 24,
-		paddingHorizontal: 20,
-	},
-	bookTitle: {
-		fontSize: 24,
-		fontWeight: "bold",
-		textAlign: "center",
-		color: "#2c3e50",
-		marginBottom: 8,
-	},
-	bookAuthor: {
-		fontSize: 18,
-		color: "#7f8c8d",
-		textAlign: "center",
-	},
-	actionButtonsContainer: {
-		flexDirection: "row",
-		marginTop: 8, // Add space between author and buttons
-		justifyContent: "center", // Center the buttons horizontally
-	},
-	actionButton: {
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		marginHorizontal: 4, // Add some space between buttons
-	},
-	actionButtonText: {
-		fontSize: 14,
-		color: "#3498db",
-	},
-	sectionContainer: {
-		backgroundColor: "#f9f9f9",
-		borderRadius: 10,
-		padding: 16,
-		marginBottom: 16,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 2,
-		elevation: 2,
-	},
-	sectionTitle: {
-		fontSize: 18,
-		fontWeight: "bold",
-		color: "#2c3e50",
-		marginBottom: 8,
-	},
-	sectionDivider: {
-		height: 1,
-		backgroundColor: "#e0e0e0",
-		marginBottom: 12,
-	},
-	fieldContainer: {
-		marginBottom: 12,
-	},
-	fieldLabel: {
-		fontSize: 15,
-		fontWeight: "bold",
-		color: "#34495e",
-		marginBottom: 4,
-	},
-	fieldValue: {
-		fontSize: 16,
-		color: "#2c3e50",
-		lineHeight: 24,
-	},
-	emptyFieldLabel: {
-		color: "#95a5a6",
-	},
-	emptyFieldValue: {
-		color: "#bdc3c7",
-		fontStyle: "italic",
-	},
-	bottomSpacer: {
-		height: 40,
-	},
-
-	// Enhanced/updated styles
-	statusContainer: {
-		flexDirection: "row",
-		flexWrap: "wrap",
-		justifyContent: "center",
-		marginVertical: 8,
-	},
-	statusBadge: {
-		paddingVertical: 6,
-		paddingHorizontal: 12,
-		borderRadius: 20,
-		margin: 4,
-		backgroundColor: "#f0f0f0",
-		borderWidth: 1,
-		borderColor: "#ddd",
-	},
-	activeStatusBadge: {
-		backgroundColor: "#e8f4fd",
-		borderColor: "#007BFF",
-	},
-	statusText: {
-		fontSize: 14,
-		color: "#777",
-	},
-	activeStatusText: {
-		color: "#007BFF",
-		fontWeight: "600",
-	},
-
-	// Deeper Look section
-	deeperLookButton: {
-		backgroundColor: "#f0f0f0",
-		borderRadius: 8,
-		padding: 14,
-		marginVertical: 10,
-		flexDirection: "row",
-		justifyContent: "center",
-		alignItems: "center",
-		borderWidth: 1,
-		borderColor: "#ddd",
-	},
-	deeperLookButtonText: {
-		fontSize: 16,
-		color: "#3498db",
-		fontWeight: "600",
-		marginRight: 8,
-	},
-	deeperLookIcon: {
-		fontSize: 14,
-		color: "#3498db",
-	},
-	deeperDetailsContainer: {
-		overflow: "hidden",
-	},
-	deeperSectionContainer: {
-		backgroundColor: "#f5f5f5",
-		borderRadius: 10,
-		padding: 16,
-		marginBottom: 16,
-		borderLeftWidth: 3,
-		borderLeftColor: "#ddd",
-	},
-	deeperSectionTitle: {
-		fontSize: 16,
-		fontWeight: "bold",
-		color: "#7f8c8d",
-		marginBottom: 8,
-	},
-	warningTitle: {
-		color: "#e74c3c",
-	},
-	warningContainer: {
-		flexDirection: "row",
-		flexWrap: "wrap",
-		marginTop: 8,
-	},
-	warningBadge: {
-		backgroundColor: "#ffebee",
-		borderRadius: 16,
-		paddingVertical: 6,
-		paddingHorizontal: 12,
-		margin: 4,
-		borderWidth: 1,
-		borderColor: "#ffcdd2",
-	},
-	warningText: {
-		color: "#c62828",
-		fontSize: 14,
-	},
-	homeButton: {
-		padding: 10,
-	},
-	homeButtonText: {
-		fontSize: 20,
-	},
-	favoriteButton: {
-		padding: 10,
-		marginRight: 5,
-	},
-	favoriteButtonText: {
-		fontSize: 24,
-	},
-	favoriteBadge: {
-		backgroundColor: "#fff3cd",
-		borderColor: "#ffd700",
-	},
-	favoriteText: {
-		color: "#856404",
-		fontWeight: "600",
-	},
-
-	// Add styles for the back button in header
-	backButton: {
-		padding: 10,
-		marginRight: 5,
-	},
-	backButtonText: {
-		fontSize: 16,
-		color: "#007BFF",
-	},
-
-	// Add styles for the section header row with favorite button
-	sectionHeaderRow: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		marginBottom: 8,
-	},
-	sectionFavoriteButton: {
-		padding: 5,
-	},
-});
