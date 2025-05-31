@@ -13,27 +13,29 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getApiEndpoint } from "../utils/apiConfig";
+import { getApiEndpoint, testApiConnection } from "../utils/apiConfig";
 import HamburgerMenu from "../components/HamburgerMenu";
 
 export default function WelcomeScreen({ navigation }) {
-	// Basic state variables
+	// State variables
 	const [totalDaysRead, setTotalDaysRead] = useState(0);
 	const [hasReadToday, setHasReadToday] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
-
-	// Book of the Day state
 	const [bookOfTheDay, setBookOfTheDay] = useState(null);
 	const [bookOfTheDayLoading, setBookOfTheDayLoading] = useState(false);
 	const [bookOfTheDayError, setBookOfTheDayError] = useState(null);
 	const [bookWidgetVisible, setBookWidgetVisible] = useState(true);
+	const [isConnected, setIsConnected] = useState(null);
 
-	// Navigation setup
+	// Setup navigation
 	useEffect(() => {
 		navigation.setOptions({
 			headerLeft: () => <HamburgerMenu />,
 			headerShown: false,
 		});
+
+		// Check API connection on mount
+		checkConnection();
 	}, [navigation]);
 
 	// Initialize Book of the Day
@@ -55,7 +57,16 @@ export default function WelcomeScreen({ navigation }) {
 		}, [])
 	);
 
-	// FETCH DATA FUNCTIONS
+	// Function to check API connection
+	const checkConnection = async () => {
+		try {
+			const connected = await testApiConnection();
+			setIsConnected(connected);
+		} catch (error) {
+			console.error("Connection test error:", error);
+			setIsConnected(false);
+		}
+	};
 
 	// Check if user has recorded reading today
 	const checkReadToday = async () => {
@@ -119,7 +130,7 @@ export default function WelcomeScreen({ navigation }) {
 				console.error("Backend save failed, using local storage instead");
 			}
 
-			// Update local state and storage regardless
+			// Update local state and storage
 			const newCount = totalDaysRead + 1;
 			setTotalDaysRead(newCount);
 			setHasReadToday(true);
@@ -138,9 +149,7 @@ export default function WelcomeScreen({ navigation }) {
 		}
 	};
 
-	// BOOK OF THE DAY FUNCTIONS
-
-	// Main function to fetch book suggestion
+	// Fetch book of the day
 	const fetchBookOfTheDay = async () => {
 		if (!bookWidgetVisible) return;
 
@@ -157,7 +166,7 @@ export default function WelcomeScreen({ navigation }) {
 				console.log("Could not read cached books:", error);
 			}
 
-			// Try personalized or random recommendation
+			// Choose recommendation strategy
 			if (userBooks.length === 0) {
 				await fetchRandomBookSuggestion();
 			} else {
@@ -181,7 +190,7 @@ export default function WelcomeScreen({ navigation }) {
 		} catch (error) {
 			console.error("Error fetching book of the day:", error);
 			setBookOfTheDayError("Could not load today's book suggestion");
-			// Fallback book
+			// Set fallback book
 			setBookOfTheDay({
 				title: "Pride and Prejudice",
 				author: "Jane Austen",
@@ -195,7 +204,7 @@ export default function WelcomeScreen({ navigation }) {
 		}
 	};
 
-	// Fetch a personalized book suggestion
+	// Get personalized book suggestion
 	const fetchPersonalizedBookSuggestion = async (
 		genres,
 		authors,
@@ -273,55 +282,35 @@ export default function WelcomeScreen({ navigation }) {
 		}
 	};
 
-	// Fallback function for random book suggestion
+	// Get random book suggestion as fallback
 	const fetchRandomBookSuggestion = async () => {
-		try {
-			// Curated list of classic books
-			const classicBooks = [
-				{
-					title: "Pride and Prejudice",
-					author: "Jane Austen",
-					genre: "classic",
-				},
-				{
-					title: "To Kill a Mockingbird",
-					author: "Harper Lee",
-					genre: "fiction",
-				},
-				{ title: "1984", author: "George Orwell", genre: "dystopian" },
-				{
-					title: "The Great Gatsby",
-					author: "F. Scott Fitzgerald",
-					genre: "classic",
-				},
-				{
-					title: "Brave New World",
-					author: "Aldous Huxley",
-					genre: "dystopian",
-				},
-			];
-
-			// Pick a random book
-			const randomBook =
-				classicBooks[Math.floor(Math.random() * classicBooks.length)];
-
-			setBookOfTheDay({
-				...randomBook,
-				description: "A classic book that every reader should explore.",
-				source: "default",
-				coverUrl: null,
-			});
-		} catch (error) {
-			console.error("Error in random book suggestion:", error);
-			// Simple fallback
-			setBookOfTheDay({
-				title: "Pride and Prejudice",
-				author: "Jane Austen",
+		// Curated list of classic books
+		const classicBooks = [
+			{ title: "Pride and Prejudice", author: "Jane Austen", genre: "classic" },
+			{
+				title: "To Kill a Mockingbird",
+				author: "Harper Lee",
+				genre: "fiction",
+			},
+			{ title: "1984", author: "George Orwell", genre: "dystopian" },
+			{
+				title: "The Great Gatsby",
+				author: "F. Scott Fitzgerald",
 				genre: "classic",
-				description: "A classic novel of manners.",
-				source: "fallback",
-			});
-		}
+			},
+			{ title: "Brave New World", author: "Aldous Huxley", genre: "dystopian" },
+		];
+
+		// Pick a random book
+		const randomBook =
+			classicBooks[Math.floor(Math.random() * classicBooks.length)];
+
+		setBookOfTheDay({
+			...randomBook,
+			description: "A classic book that every reader should explore.",
+			source: "default",
+			coverUrl: null,
+		});
 	};
 
 	// Add suggested book to library
@@ -387,195 +376,168 @@ export default function WelcomeScreen({ navigation }) {
 		}
 	};
 
-	// Render the Book of the Day widget
+	// Render Book of the Day widget
 	const renderBookOfTheDay = () => {
 		if (!bookWidgetVisible) return null;
 
-		try {
-			// Loading state
-			if (bookOfTheDayLoading && !bookOfTheDay) {
-				return (
-					<View style={styles.bookOfTheDayCard}>
-						<Text style={styles.bookOfTheDayTitle}>Book of the Day</Text>
-						<View style={styles.bookOfTheDayLoading}>
-							<ActivityIndicator size="large" color="#0000ff" />
-							<Text style={styles.loadingText}>
-								Finding the perfect book for you...
-							</Text>
-						</View>
-					</View>
-				);
-			}
-
-			// Error state
-			if (bookOfTheDayError && !bookOfTheDay) {
-				return (
-					<View style={styles.bookOfTheDayCard}>
-						<Text style={styles.bookOfTheDayTitle}>Book of the Day</Text>
-						<Text style={styles.errorText}>{bookOfTheDayError}</Text>
-						<TouchableOpacity
-							style={styles.retryButton}
-							onPress={fetchBookOfTheDay}
-						>
-							<Text style={styles.retryButtonText}>Try Again</Text>
-						</TouchableOpacity>
-					</View>
-				);
-			}
-
-			// No book to display
-			if (!bookOfTheDay) return null;
-
-			// Book suggestion
+		// Loading state
+		if (bookOfTheDayLoading && !bookOfTheDay) {
 			return (
 				<View style={styles.bookOfTheDayCard}>
 					<Text style={styles.bookOfTheDayTitle}>Book of the Day</Text>
-					<View style={styles.bookOfTheDayContent}>
-						{/* Book Cover */}
-						{bookOfTheDay.coverUrl ? (
-							<Image
-								source={{ uri: bookOfTheDay.coverUrl }}
-								style={styles.bookCover}
-								resizeMode="contain"
-							/>
-						) : (
-							<View style={styles.placeholderCover}>
-								<Text style={styles.placeholderText}>
-									{bookOfTheDay.title.substring(0, 1)}
-								</Text>
-							</View>
-						)}
-
-						{/* Book Details */}
-						<View style={styles.bookDetails}>
-							<Text style={styles.bookTitle}>{bookOfTheDay.title}</Text>
-							<Text style={styles.bookAuthor}>by {bookOfTheDay.author}</Text>
-							{bookOfTheDay.publishYear && (
-								<Text style={styles.bookYear}>{bookOfTheDay.publishYear}</Text>
-							)}
-							<Text style={styles.bookGenre}>
-								Genre:{" "}
-								{bookOfTheDay.genre
-									? bookOfTheDay.genre.charAt(0).toUpperCase() +
-									  bookOfTheDay.genre.slice(1)
-									: "General"}
-							</Text>
-							<Text style={styles.bookDescription} numberOfLines={2}>
-								{bookOfTheDay.description}
-							</Text>
-						</View>
-					</View>
-
-					{/* Action Buttons */}
-					<TouchableOpacity
-						style={styles.quickAddButton}
-						onPress={quickAddSuggestedBook}
-						disabled={bookOfTheDayLoading}
-					>
-						{bookOfTheDayLoading ? (
-							<ActivityIndicator size="small" color="white" />
-						) : (
-							<Text style={styles.quickAddButtonText}>Add to My Books</Text>
-						)}
-					</TouchableOpacity>
-
-					<TouchableOpacity
-						style={styles.newSuggestionButton}
-						onPress={fetchBookOfTheDay}
-						disabled={bookOfTheDayLoading}
-					>
-						<Text style={styles.newSuggestionButtonText}>
-							Get New Suggestion
+					<View style={styles.bookOfTheDayLoading}>
+						<ActivityIndicator size="large" color="#0000ff" />
+						<Text style={styles.loadingText}>
+							Finding the perfect book for you...
 						</Text>
+					</View>
+				</View>
+			);
+		}
+
+		// Error state
+		if (bookOfTheDayError && !bookOfTheDay) {
+			return (
+				<View style={styles.bookOfTheDayCard}>
+					<Text style={styles.bookOfTheDayTitle}>Book of the Day</Text>
+					<Text style={styles.errorText}>{bookOfTheDayError}</Text>
+					<TouchableOpacity
+						style={styles.retryButton}
+						onPress={fetchBookOfTheDay}
+					>
+						<Text style={styles.retryButtonText}>Try Again</Text>
 					</TouchableOpacity>
 				</View>
 			);
-		} catch (error) {
-			console.error("Error rendering Book of the Day widget:", error);
-			return null;
 		}
-	};
 
-	// Main render function with error boundary
-	try {
+		// No book to display
+		if (!bookOfTheDay) return null;
+
+		// Book suggestion
 		return (
-			<SafeAreaView style={styles.container}>
-				<ScrollView style={styles.scrollView}>
-					{/* Welcome Header */}
-					<View style={styles.header}>
-						<Text style={styles.welcomeTitle}>Welcome to BookWyrm</Text>
-						<Text style={styles.welcomeSubtitle}>
-							Your personal book companion
-						</Text>
-					</View>
-
-					{/* Main Navigation Buttons */}
-					<View style={styles.buttonsContainer}>
-						<TouchableOpacity
-							style={styles.mainButton}
-							onPress={() => navigation.navigate("BookListScreen")}
-						>
-							<Text style={styles.mainButtonText}>My Books</Text>
-						</TouchableOpacity>
-
-						<TouchableOpacity
-							style={styles.mainButton}
-							onPress={() => navigation.navigate("BookFormScreen")}
-						>
-							<Text style={styles.mainButtonText}>Add New Book</Text>
-						</TouchableOpacity>
-
-						<TouchableOpacity
-							style={styles.mainButton}
-							onPress={() => navigation.navigate("Favorites")}
-						>
-							<Text style={styles.mainButtonText}>Favorites</Text>
-						</TouchableOpacity>
-
-						<TouchableOpacity
-							style={styles.mainButton}
-							onPress={() => navigation.navigate("Trash")}
-						>
-							<Text style={styles.mainButtonText}>Recently Deleted</Text>
-						</TouchableOpacity>
-					</View>
-
-					{/* Book of the Day Widget */}
-					{renderBookOfTheDay()}
-
-					{/* Debug Information (Development Only) */}
-					{__DEV__ && (
-						<View style={styles.debugInfo}>
-							<Text style={styles.debugText}>Running on: {Platform.OS}</Text>
-							<Text style={styles.debugText}>Version: {Platform.Version}</Text>
+			<View style={styles.bookOfTheDayCard}>
+				<Text style={styles.bookOfTheDayTitle}>Book of the Day</Text>
+				<View style={styles.bookOfTheDayContent}>
+					{/* Book Cover */}
+					{bookOfTheDay.coverUrl ? (
+						<Image
+							source={{ uri: bookOfTheDay.coverUrl }}
+							style={styles.bookCover}
+							resizeMode="contain"
+						/>
+					) : (
+						<View style={styles.placeholderCover}>
+							<Text style={styles.placeholderText}>
+								{bookOfTheDay.title.substring(0, 1)}
+							</Text>
 						</View>
 					)}
-				</ScrollView>
-			</SafeAreaView>
-		);
-	} catch (error) {
-		console.error("Critical error in welcome screen render:", error);
-		// Fallback for catastrophic failures
-		return (
-			<SafeAreaView
-				style={[
-					styles.container,
-					{ justifyContent: "center", alignItems: "center" },
-				]}
-			>
-				<Text style={styles.welcomeTitle}>Welcome to BookWyrm</Text>
+
+					{/* Book Details */}
+					<View style={styles.bookDetails}>
+						<Text style={styles.bookTitle}>{bookOfTheDay.title}</Text>
+						<Text style={styles.bookAuthor}>by {bookOfTheDay.author}</Text>
+						{bookOfTheDay.publishYear && (
+							<Text style={styles.bookYear}>{bookOfTheDay.publishYear}</Text>
+						)}
+						<Text style={styles.bookGenre}>
+							Genre:{" "}
+							{bookOfTheDay.genre
+								? bookOfTheDay.genre.charAt(0).toUpperCase() +
+								  bookOfTheDay.genre.slice(1)
+								: "General"}
+						</Text>
+						<Text style={styles.bookDescription} numberOfLines={2}>
+							{bookOfTheDay.description}
+						</Text>
+					</View>
+				</View>
+
+				{/* Action Buttons */}
 				<TouchableOpacity
-					style={styles.mainButton}
-					onPress={() => navigation.navigate("BookListScreen")}
+					style={styles.quickAddButton}
+					onPress={quickAddSuggestedBook}
+					disabled={bookOfTheDayLoading}
 				>
-					<Text style={styles.mainButtonText}>My Books</Text>
+					{bookOfTheDayLoading ? (
+						<ActivityIndicator size="small" color="white" />
+					) : (
+						<Text style={styles.quickAddButtonText}>Add to My Books</Text>
+					)}
 				</TouchableOpacity>
-			</SafeAreaView>
+
+				<TouchableOpacity
+					style={styles.newSuggestionButton}
+					onPress={fetchBookOfTheDay}
+					disabled={bookOfTheDayLoading}
+				>
+					<Text style={styles.newSuggestionButtonText}>Get New Suggestion</Text>
+				</TouchableOpacity>
+			</View>
 		);
-	}
+	};
+
+	return (
+		<SafeAreaView style={styles.container}>
+			<ScrollView style={styles.scrollView}>
+				{/* Welcome Header */}
+				<View style={styles.header}>
+					<Text style={styles.welcomeTitle}>Welcome to BookWyrm</Text>
+					<Text style={styles.welcomeSubtitle}>
+						Your personal book companion
+					</Text>
+				</View>
+
+				{/* Main Navigation Buttons */}
+				<View style={styles.buttonsContainer}>
+					<TouchableOpacity
+						style={styles.mainButton}
+						onPress={() => navigation.navigate("BookListScreen")}
+					>
+						<Text style={styles.mainButtonText}>My Books</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						style={styles.mainButton}
+						onPress={() => navigation.navigate("BookFormScreen")}
+					>
+						<Text style={styles.mainButtonText}>Add New Book</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						style={styles.mainButton}
+						onPress={() => navigation.navigate("Favorites")}
+					>
+						<Text style={styles.mainButtonText}>Favorites</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						style={styles.mainButton}
+						onPress={() => navigation.navigate("Trash")}
+					>
+						<Text style={styles.mainButtonText}>Recently Deleted</Text>
+					</TouchableOpacity>
+
+					{/* Connection Test Button */}
+					<TouchableOpacity
+						style={styles.connectionTestButton}
+						onPress={() => navigation.navigate("ConnectionTest")}
+					>
+						<Text style={styles.connectionTestButtonText}>
+							Test API Connection
+							{isConnected !== null && (isConnected ? " ✓" : " ✗")}
+						</Text>
+					</TouchableOpacity>
+				</View>
+
+				{/* Book of the Day Widget */}
+				{renderBookOfTheDay()}
+			</ScrollView>
+		</SafeAreaView>
+	);
 }
 
-// Keep existing styles
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
@@ -736,111 +698,17 @@ const styles = StyleSheet.create({
 	retryButtonText: {
 		color: "white",
 	},
-	// Hamburger menu styles
-	menuButton: {
-		position: "absolute",
-		top: 40,
-		left: 20,
-		zIndex: 100,
-		padding: 10,
-	},
-	menuButtonText: {
-		fontSize: 30,
-		color: "#2c3e50",
-	},
-	modalOverlay: {
-		flex: 1,
-		backgroundColor: "rgba(0,0,0,0.5)",
-	},
-	dropdownMenu: {
-		position: "absolute",
-		top: 80,
-		left: 20,
-		backgroundColor: "white",
-		borderRadius: 8,
-		paddingVertical: 8,
-		paddingHorizontal: 4,
-		width: 200,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.25,
-		shadowRadius: 3.84,
-		elevation: 5,
-	},
-	menuItem: {
-		flexDirection: "row",
-		alignItems: "center",
+	connectionTestButton: {
+		backgroundColor: "#2196F3",
 		paddingVertical: 12,
-		paddingHorizontal: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: "#f0f0f0",
-	},
-	menuItemIcon: {
-		fontSize: 20,
-		marginRight: 12,
-	},
-	menuItemText: {
-		fontSize: 16,
-		color: "#2c3e50",
-	},
-	// New styles for the reading counter and button
-	counterContainer: {
-		position: "absolute",
-		top: Platform.OS === "ios" ? 40 : 20,
-		right: 20,
-		alignItems: "center",
-		backgroundColor: "rgba(255, 255, 255, 0.9)",
-		paddingHorizontal: 15,
-		paddingVertical: 10,
-		borderRadius: 15,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.2,
-		shadowRadius: 3,
-		elevation: 3,
-	},
-	counterLabel: {
-		fontSize: 12,
-		fontWeight: "600",
-		color: "#007BFF",
-		textAlign: "center",
-	},
-	counterValue: {
-		fontSize: 24,
-		fontWeight: "bold",
-		color: "#007BFF",
-	},
-	readTodayButton: {
-		backgroundColor: "#28a745", // Green color
-		paddingVertical: 15,
-		paddingHorizontal: 30,
-		borderRadius: 10,
-		marginBottom: 20,
-		marginTop: 10,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.3,
-		shadowRadius: 3,
-		elevation: 5,
-	},
-	readTodayButtonDisabled: {
-		backgroundColor: "#6c757d", // Gray when already read today
-	},
-	readTodayButtonText: {
-		color: "white",
-		fontSize: 18,
-		fontWeight: "bold",
-		textAlign: "center",
-	},
-	// Add debug styles
-	debugInfo: {
-		marginTop: 20,
-		padding: 10,
-		backgroundColor: "#f0f0f0",
+		paddingHorizontal: 20,
 		borderRadius: 5,
+		marginTop: 10,
+		alignSelf: "center",
 	},
-	debugText: {
-		fontSize: 12,
-		color: "#666",
+	connectionTestButtonText: {
+		color: "white",
+		fontWeight: "bold",
+		fontSize: 14,
 	},
 });
