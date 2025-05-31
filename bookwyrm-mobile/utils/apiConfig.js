@@ -47,9 +47,9 @@ let workingApiUrl = null;
 // DEVICE-SPECIFIC CONFIGURATION
 // ===============================
 // IMPORTANT: Update these values with your actual device and computer information
-const COMPUTER_LOCAL_IP = "192.168.0.57";   // Your computer's IP address on the local network
+// const BASE_SERVER_URL = "192.168.0.57";   // Your computer's IP address on the local network
 const BASE_SERVER_URL = "127.0.0.1";        // Your server's base URL (usually localhost)
-const IPHONE_IP = "192.168.0.158";          // Your iPhone's IP address
+// const IPHONE_IP = "192.168.0.158";          // Your iPhone's IP address
 
 // Device detection helper
 const isPhysicalDevice = Platform.OS === "ios" && !global.nativeCallSyncHook;
@@ -85,7 +85,7 @@ const getDevServerIp = () => {
       }
       
       // Always return the computer's IP as a reliable fallback in dev mode
-      return COMPUTER_LOCAL_IP;
+      return BASE_SERVER_URL;
     } catch (error) {
       console.warn("Error getting dev server IP:", error);
     }
@@ -135,14 +135,14 @@ const initializeApiUrls = async () => {
     
     // HIGHEST PRIORITY: Your specific devices
     // The most reliable connection is your computer's IP address for physical devices
-    urls.push(`http://${COMPUTER_LOCAL_IP}:${API_PORT}/api`);
-    console.log(`Added primary computer IP: http://${COMPUTER_LOCAL_IP}:${API_PORT}/api`);
-    
+    urls.push(`http://${BASE_SERVER_URL}:${API_PORT}/api`);
+    console.log(`Added primary computer IP: http://${BASE_SERVER_URL}:${API_PORT}/api`);
+
     // If we know this is running on your iPhone, prioritize a direct connection
     if (networkState.details?.ipAddress === IPHONE_IP) {
       console.log(`Detected iPhone at ${IPHONE_IP}, optimizing connection`);
       // Prioritize computer's IP for iPhone connection
-      urls.unshift(`http://${COMPUTER_LOCAL_IP}:${API_PORT}/api`);
+      urls.unshift(`http://${BASE_SERVER_URL}:${API_PORT}/api`);
     }
 
     // SECTION 2: SIMULATOR-SPECIFIC CONFIGURATIONS
@@ -166,7 +166,7 @@ const initializeApiUrls = async () => {
     // =======================================
     
     // Expo Go app will use the dev server IP
-    if (devServerIp && devServerIp !== COMPUTER_LOCAL_IP) {
+    if (devServerIp && devServerIp !== BASE_SERVER_URL) {
       urls.push(`http://${devServerIp}:${API_PORT}/api`);
       console.log(`Added Expo dev server URL: ${devServerIp}`);
     }
@@ -197,14 +197,14 @@ const initializeApiUrls = async () => {
     const localPrefixes = getCommonLocalIpPrefixes();
     localPrefixes.forEach((prefix) => {
       // Only add IPs close to our known computer IP to reduce the number of attempts
-      if (COMPUTER_LOCAL_IP.startsWith(prefix)) {
+      if (BASE_SERVER_URL.startsWith(prefix)) {
         // Focus on IPs near our computer's IP by checking nearby addresses
-        const lastOctet = parseInt(COMPUTER_LOCAL_IP.split('.').pop());
+        const lastOctet = parseInt(BASE_SERVER_URL.split('.').pop());
         [-2, -1, 0, 1, 2, 3, 4, 5].forEach(offset => {
           const targetOctet = lastOctet + offset;
           if (targetOctet > 0 && targetOctet < 255) {
             const ip = `${prefix}${targetOctet}`;
-            if (ip !== COMPUTER_LOCAL_IP) { // Avoid duplication
+            if (ip !== BASE_SERVER_URL) { // Avoid duplication
               urls.push(`http://${ip}:${API_PORT}/api`);
             }
           }
@@ -246,10 +246,10 @@ export const getApiEndpoint = (path) => {
   try {
     // Use the known working URL if available, otherwise use the first URL
     // Safely handle the case where API_URLS might be empty
-    const baseUrl = workingApiUrl || (API_URLS.length > 0 ? API_URLS[0] : `http://${COMPUTER_LOCAL_IP}:${API_PORT}/api`);
+    const baseUrl = workingApiUrl || (API_URLS.length > 0 ? API_URLS[0] : `http://${BASE_SERVER_URL}:${API_PORT}/api`);
 
     // Guard against undefined/null baseUrl
-    if (!baseUrl) return `http://${COMPUTER_LOCAL_IP}:${API_PORT}/api/${path || ""}`;
+    if (!baseUrl) return `http://${BASE_SERVER_URL}:${API_PORT}/api/${path || ""}`;
 
     // Ensure base URL ends with slash
     const formattedBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
@@ -267,7 +267,7 @@ export const getApiEndpoint = (path) => {
   } catch (error) {
     // Safely handle any unexpected errors and provide a fallback
     console.error("Error in getApiEndpoint:", error);
-    return `http://${COMPUTER_LOCAL_IP}:${API_PORT}/api/${path || ""}`;
+    return `http://${BASE_SERVER_URL}:${API_PORT}/api/${path || ""}`;
   }
 };
 
@@ -279,10 +279,10 @@ export const getMediaUrl = () => {
   try {
     // Use the known working URL base or first available
     // Safely handle the case where API_URLS might be empty
-    const baseUrl = workingApiUrl || (API_URLS.length > 0 ? API_URLS[0] : `http://${COMPUTER_LOCAL_IP}:${API_PORT}/api`);
+    const baseUrl = workingApiUrl || (API_URLS.length > 0 ? API_URLS[0] : `http://${BASE_SERVER_URL}:${API_PORT}/api`);
     
     // Guard against undefined/null baseUrl
-    if (!baseUrl) return `http://${COMPUTER_LOCAL_IP}:${API_PORT}/media/`;
+    if (!baseUrl) return `http://${BASE_SERVER_URL}:${API_PORT}/media/`;
 
     // Get the base URL without 'api/'
     // Fix the error: Cannot read property 'replace' of undefined
@@ -291,7 +291,7 @@ export const getMediaUrl = () => {
   } catch (error) {
     // Safely handle any unexpected errors and provide a fallback
     console.error("Error in getMediaUrl:", error);
-    return `http://${COMPUTER_LOCAL_IP}:${API_PORT}/media/`;
+    return `http://${BASE_SERVER_URL}:${API_PORT}/media/`;
   }
 };
 
@@ -305,7 +305,7 @@ export const getBookPhotosUrl = () => {
   } catch (error) {
     // Safely handle any unexpected errors and provide a fallback
     console.error("Error in getBookPhotosUrl:", error);
-    return `http://${COMPUTER_LOCAL_IP}:${API_PORT}/media/book_photos/`;
+    return `http://${BASE_SERVER_URL}:${API_PORT}/media/book_photos/`;
   }
 };
 
