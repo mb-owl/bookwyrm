@@ -26,8 +26,8 @@ SECRET_KEY = 'django-insecure-#hwc36lsm@2vj#2p)k4pm@-u#3bi#(e_5gal@efxh&p84r%uj2
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-# Allow both localhost and specific IP address
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.0.57']
+# Allow connections from any host in development
+ALLOWED_HOSTS = ['*'] if DEBUG else ['localhost', '127.0.0.1']
 
 # Application definition
 
@@ -127,7 +127,7 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Ensure CORS is properly configured
-CORS_ALLOW_ALL_ORIGINS = True  # For development only, restrict in production
+CORS_ALLOW_ALL_ORIGINS = True if DEBUG else False
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
     'DELETE',
@@ -147,6 +147,15 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
+]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    # Add your Expo development server if needed
+    "http://localhost:19000",
+    "http://localhost:19001",
+    "http://localhost:19002",
 ]
 
 # Make sure Django serves media files in development

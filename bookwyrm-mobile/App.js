@@ -8,6 +8,7 @@ import {
 	Text,
 	TouchableOpacity,
 	StyleSheet,
+	ScrollView,
 } from "react-native";
 
 // Import API configuration and screens
@@ -74,15 +75,24 @@ const NetworkStatusIndicator = ({ isConnected, onPress }) => (
 	</TouchableOpacity>
 );
 
-// Check server connectivity
+// Check server connectivity with updated debugging
 const checkServerConnection = async () => {
 	try {
-		// Use the API testing function if available
+		// First try using the testApiConnection function
 		if (apiConfig.testApiConnection) {
+			console.log("Using apiConfig.testApiConnection");
 			return await apiConfig.testApiConnection();
 		}
 
-		// Fallback to manual check
+		// Then try to find a working URL if the first test fails
+		if (apiConfig.findWorkingApiUrl) {
+			console.log("Trying to find a working API URL");
+			const workingUrl = await apiConfig.findWorkingApiUrl();
+			return !!workingUrl;
+		}
+
+		// Last resort: manual check with current configuration
+		console.log("Falling back to manual connection check");
 		const endpoint = getApiEndpoint("books");
 		console.log("Checking server connection to:", endpoint);
 
@@ -147,7 +157,9 @@ export default function App() {
 				`Platform: ${debugInfo.platform || Platform.OS} (${
 					Platform.isDevice ? "Device" : "Simulator"
 				})\n` +
-				`API URL: http://127.0.0.1:8000/api`,
+				`Device IP: ${debugInfo.deviceIp || "Unknown"}\n` +
+				`API Host: ${debugInfo.currentApiHost || "Unknown"}\n` +
+				`API URL: ${debugInfo.baseApiUrl || "Unknown"}`,
 			[
 				{ text: "More Details", onPress: () => setShowDebugInfo(true) },
 				{ text: "OK", style: "cancel" },
@@ -156,6 +168,11 @@ export default function App() {
 					onPress: async () => {
 						const connected = await checkServerConnection();
 						setApiConnected(connected);
+
+						// Get updated debug info
+						const debug = (await apiConfig.debugApiConnection?.()) || {};
+						setDebugInfo(debug);
+
 						Alert.alert(
 							"Connection Test",
 							connected
@@ -197,11 +214,55 @@ export default function App() {
 				</View>
 
 				<View style={styles.debugRow}>
-					<Text style={styles.debugLabel}>API URL:</Text>
-					<Text style={styles.debugValue} numberOfLines={1}>
-						http://127.0.0.1:8000/api
+					<Text style={styles.debugLabel}>Device IP:</Text>
+					<Text style={styles.debugValue}>
+						{debugInfo.deviceIp || "Unknown"}
 					</Text>
 				</View>
+
+				<View style={styles.debugRow}>
+					<Text style={styles.debugLabel}>Expo Host IP:</Text>
+					<Text style={styles.debugValue}>{debugInfo.expoHostIp || "N/A"}</Text>
+				</View>
+
+				<View style={styles.debugRow}>
+					<Text style={styles.debugLabel}>API Host:</Text>
+					<Text style={styles.debugValue} numberOfLines={1}>
+						{debugInfo.currentApiHost || "Unknown"}
+					</Text>
+				</View>
+
+				<View style={styles.debugRow}>
+					<Text style={styles.debugLabel}>API URL:</Text>
+					<Text style={styles.debugValue} numberOfLines={1}>
+						{debugInfo.baseApiUrl || "Unknown"}
+					</Text>
+				</View>
+
+				{debugInfo.urlTests && (
+					<>
+						<Text style={styles.debugSectionTitle}>URL Test Results:</Text>
+						<ScrollView style={styles.urlTestList}>
+							{debugInfo.urlTests.map((test, index) => (
+								<View key={index} style={styles.urlTestItem}>
+									<Text
+										style={[
+											styles.urlTestStatus,
+											test.success
+												? styles.connectedText
+												: styles.disconnectedText,
+										]}
+									>
+										{test.success ? "✓" : "✗"}
+									</Text>
+									<Text style={styles.urlTestUrl} numberOfLines={1}>
+										{test.url}
+									</Text>
+								</View>
+							))}
+						</ScrollView>
+					</>
+				)}
 
 				<View style={styles.debugButtonRow}>
 					<TouchableOpacity
@@ -394,5 +455,31 @@ const styles = StyleSheet.create({
 	debugButtonText: {
 		color: "white",
 		fontWeight: "bold",
+	},
+	urlTestList: {
+		maxHeight: 150,
+		marginVertical: 8,
+	},
+	urlTestItem: {
+		flexDirection: "row",
+		alignItems: "center",
+		paddingVertical: 4,
+	},
+	urlTestStatus: {
+		width: 20,
+		fontSize: 16,
+		fontWeight: "bold",
+	},
+	urlTestUrl: {
+		flex: 1,
+		fontSize: 12,
+		color: "#ddd",
+	},
+	debugSectionTitle: {
+		color: "#BBDEFB",
+		fontSize: 14,
+		fontWeight: "bold",
+		marginTop: 10,
+		marginBottom: 5,
 	},
 });
