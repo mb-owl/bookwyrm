@@ -20,7 +20,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 
 // Import API configuration
-import { API_BASE_URL } from "../utils/apiConfig";
+import { API_BASE_URL, getApiEndpoint } from "../utils/apiConfig";
 import {
 	syncGenresWithBackend,
 	fetchGenresFromBackend,
@@ -1427,7 +1427,7 @@ export default function BookFormScreen({ route, navigation }) {
 		}
 	};
 
-	// UPDATED: Handle the form submission with added number_of_chapters
+	// UPDATED: Handle the form submission with improved URL handling
 	const handleSubmit = async () => {
 		if (!title || !author) {
 			Alert.alert("Title and author are required fields.");
@@ -1548,21 +1548,30 @@ export default function BookFormScreen({ route, navigation }) {
 				formData.append("replace_photos", "true");
 			}
 
-			// Determine the API endpoint with proper trailing slash
-			const baseUrl = API_BASE_URL.endsWith("/")
-				? API_BASE_URL
-				: `${API_BASE_URL}/`;
-			let url = editingBook
-				? `${baseUrl}books/${editingBook.id}/`
-				: `${baseUrl}books/`;
+			// Determine the API endpoint with improved error handling
+			let url;
+			try {
+				if (editingBook) {
+					url = getApiEndpoint(`books/${editingBook.id}/`);
+				} else {
+					url = getApiEndpoint("books/");
+				}
+				console.log("Using API URL:", url);
+			} catch (error) {
+				console.error("Error constructing API URL:", error);
+				// Fallback to a safe default if getApiEndpoint fails
+				const baseUrl = "http://localhost:8000/api";
+				url = editingBook
+					? `${baseUrl}/books/${editingBook.id}/`
+					: `${baseUrl}/books/`;
+			}
 
-			// Ensure URL has trailing slash for Django
+			// Ensure URL has trailing slash for Django compatibility
 			if (!url.endsWith("/")) {
 				url += "/";
 			}
 
-			const method = editingBook ? "PUT" : "POST";
-			console.log(`Submitting to ${method} ${url}`);
+			console.log(`Submitting to ${editingBook ? "PUT" : "POST"} ${url}`);
 
 			// Debug the form data
 			console.log("Form data entries:");
@@ -1576,7 +1585,7 @@ export default function BookFormScreen({ route, navigation }) {
 
 			// IMPROVED: Submit with explicit content type
 			const response = await fetch(url, {
-				method: method,
+				method: editingBook ? "PUT" : "POST",
 				body: formData,
 				headers: {
 					Accept: "application/json",
