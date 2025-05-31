@@ -394,9 +394,3 @@ export const getAllApiUrls = () => {
   return [...API_URLS];
 };
 
-/**
- * Set a specific API URL as the working URL
- * @param {string} url - The URL to use
- */
-export const setWorkingApiUrl = (url) => {
-  if
