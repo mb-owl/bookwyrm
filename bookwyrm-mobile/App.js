@@ -10,17 +10,8 @@ import {
 	StyleSheet,
 } from "react-native";
 
-// Import API configuration safely
+// Import API configuration and screens
 import * as apiConfig from "./utils/apiConfig";
-const getApiEndpoint =
-	apiConfig.getApiEndpoint ||
-	((path) => `http://localhost:8000/api/${path || ""}`);
-
-// Import the debug function
-const debugApiConnection =
-	apiConfig.debugApiConnection || (() => Promise.resolve({}));
-
-// Import screens directly instead of using dynamic require
 import WelcomeScreen from "./screens/welcome";
 import BookListScreen from "./screens/booklistscreen";
 import BookDetailScreen from "./screens/bookdetailscreen";
@@ -28,7 +19,12 @@ import BookFormScreen from "./screens/bookformscreen";
 import FavoritesScreen from "./screens/favorites";
 import TrashScreen from "./screens/trashscreen";
 
-// Create error wrapper component for screen components
+// Fallback for API endpoints if needed
+const getApiEndpoint =
+	apiConfig.getApiEndpoint ||
+	((path) => `http://127.0.0.1:8000/api/${path || ""}`);
+
+// Error boundary HOC
 const withErrorBoundary = (ScreenComponent, screenName) => {
 	return (props) => {
 		try {
@@ -47,7 +43,7 @@ const withErrorBoundary = (ScreenComponent, screenName) => {
 	};
 };
 
-// Wrap each screen with error boundary
+// Wrap screens with error boundary
 const SafeWelcomeScreen = withErrorBoundary(WelcomeScreen, "WelcomeScreen");
 const SafeBookListScreen = withErrorBoundary(BookListScreen, "BookListScreen");
 const SafeBookDetailScreen = withErrorBoundary(
@@ -63,7 +59,7 @@ const SafeTrashScreen = withErrorBoundary(TrashScreen, "TrashScreen");
 
 const Stack = createNativeStackNavigator();
 
-// Add a NetworkStatus component for better visibility into API connection
+// Network status indicator
 const NetworkStatusIndicator = ({ isConnected, onPress }) => (
 	<TouchableOpacity
 		style={[
@@ -81,12 +77,17 @@ const NetworkStatusIndicator = ({ isConnected, onPress }) => (
 // Check server connectivity
 const checkServerConnection = async () => {
 	try {
-		// Use the books endpoint which definitely exists
+		// Use the API testing function if available
+		if (apiConfig.testApiConnection) {
+			return await apiConfig.testApiConnection();
+		}
+
+		// Fallback to manual check
 		const endpoint = getApiEndpoint("books");
 		console.log("Checking server connection to:", endpoint);
 
 		const controller = new AbortController();
-		const timeoutId = setTimeout(() => controller.abort(), 10000);
+		const timeoutId = setTimeout(() => controller.abort(), 8000);
 
 		const response = await fetch(endpoint, {
 			method: "GET",
@@ -95,18 +96,9 @@ const checkServerConnection = async () => {
 		});
 
 		clearTimeout(timeoutId);
-		console.log("Server check response status:", response.status);
-
-		if (response.ok) {
-			console.log("Server connection successful");
-			return true;
-		} else {
-			console.error("Server returned error:", response.status);
-			throw new Error(`Server responded with status: ${response.status}`);
-		}
+		return response.ok;
 	} catch (error) {
 		console.error("Server connection error:", error);
-		console.warn(`Could not connect to the server. Error: ${error.message}`);
 		return false;
 	}
 };
@@ -117,17 +109,17 @@ export default function App() {
 	const [showDebugInfo, setShowDebugInfo] = useState(false);
 	const [debugInfo, setDebugInfo] = useState({});
 
+	// Initialize app and set up connection checking
 	useEffect(() => {
-		// Initialize app and handle errors gracefully
 		const initApp = async () => {
 			try {
-				// Small delay before checking server connectivity
+				// Small delay before checking connectivity
 				await new Promise((resolve) => setTimeout(resolve, 1000));
 				const connected = await checkServerConnection();
 				setApiConnected(connected);
 
 				// Get debug info
-				const debug = await debugApiConnection();
+				const debug = (await apiConfig.debugApiConnection?.()) || {};
 				setDebugInfo(debug);
 			} catch (error) {
 				console.warn("App initialization error:", error);
@@ -138,36 +130,27 @@ export default function App() {
 
 		initApp();
 
-		// Set up periodic API connection checks
+		// Check connection periodically
 		const intervalId = setInterval(async () => {
 			const connected = await checkServerConnection();
 			setApiConnected(connected);
-		}, 30000); // Check every 30 seconds
+		}, 30000);
 
 		return () => clearInterval(intervalId);
 	}, []);
 
+	// Show debug alert
 	const showDebugAlert = () => {
 		Alert.alert(
 			"API Connection Debug",
 			`Server: ${apiConnected ? "Connected" : "Disconnected"}\n` +
-				`Platform: ${debugInfo.platform} (${
-					debugInfo.isDevice ? "Device" : "Simulator"
+				`Platform: ${debugInfo.platform || Platform.OS} (${
+					Platform.isDevice ? "Device" : "Simulator"
 				})\n` +
-				`Device IP: ${
-					debugInfo.networkInfo?.details?.ipAddress || "Unknown"
-				}\n` +
-				`Computer IP: ${debugInfo.computerIp || "Unknown"}\n` +
-				`Active API URL: ${debugInfo.workingApiUrl || "None"}`,
+				`API URL: http://127.0.0.1:8000/api`,
 			[
-				{
-					text: "More Details",
-					onPress: () => setShowDebugInfo(true),
-				},
-				{
-					text: "OK",
-					style: "cancel",
-				},
+				{ text: "More Details", onPress: () => setShowDebugInfo(true) },
+				{ text: "OK", style: "cancel" },
 				{
 					text: "Retry Connection",
 					onPress: async () => {
@@ -208,37 +191,17 @@ export default function App() {
 				<View style={styles.debugRow}>
 					<Text style={styles.debugLabel}>Platform:</Text>
 					<Text style={styles.debugValue}>
-						{debugInfo.platform} ({debugInfo.isDevice ? "Device" : "Simulator"})
+						{debugInfo.platform || Platform.OS} (
+						{Platform.isDevice ? "Device" : "Simulator"})
 					</Text>
 				</View>
 
 				<View style={styles.debugRow}>
-					<Text style={styles.debugLabel}>Device IP:</Text>
-					<Text style={styles.debugValue}>
-						{debugInfo.networkInfo?.details?.ipAddress || "Unknown"}
-					</Text>
-				</View>
-
-				<View style={styles.debugRow}>
-					<Text style={styles.debugLabel}>Computer IP:</Text>
-					<Text style={styles.debugValue}>
-						{debugInfo.computerIp || "Unknown"}
-					</Text>
-				</View>
-
-				<View style={styles.debugRow}>
-					<Text style={styles.debugLabel}>Active API URL:</Text>
+					<Text style={styles.debugLabel}>API URL:</Text>
 					<Text style={styles.debugValue} numberOfLines={1}>
-						{debugInfo.workingApiUrl || "None"}
+						http://127.0.0.1:8000/api
 					</Text>
 				</View>
-
-				<Text style={styles.debugSectionTitle}>Available API URLs:</Text>
-				{debugInfo.apiUrls?.map((url, index) => (
-					<Text key={index} style={styles.debugUrlItem} numberOfLines={1}>
-						{index + 1}. {url}
-					</Text>
-				))}
 
 				<View style={styles.debugButtonRow}>
 					<TouchableOpacity
@@ -246,7 +209,7 @@ export default function App() {
 						onPress={async () => {
 							const connected = await checkServerConnection();
 							setApiConnected(connected);
-							const debug = await debugApiConnection();
+							const debug = (await apiConfig.debugApiConnection?.()) || {};
 							setDebugInfo(debug);
 						}}
 					>
@@ -264,7 +227,7 @@ export default function App() {
 		);
 	};
 
-	// Show a loading screen while initializing
+	// Show loading screen while initializing
 	if (!appReady) {
 		return (
 			<View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -273,7 +236,7 @@ export default function App() {
 		);
 	}
 
-	// Add an error boundary
+	// Main app UI with error boundary
 	try {
 		return (
 			<NavigationContainer>
@@ -327,7 +290,7 @@ export default function App() {
 			</NavigationContainer>
 		);
 	} catch (error) {
-		// Provide a fallback UI in case of error
+		// Fallback UI for fatal errors
 		console.error("Fatal error in App component:", error);
 		return (
 			<View
@@ -352,7 +315,7 @@ export default function App() {
 	}
 }
 
-// Add new styles for network status and debug overlay
+// Styles for network status and debug overlay
 const styles = StyleSheet.create({
 	networkIndicator: {
 		position: "absolute",
@@ -412,18 +375,6 @@ const styles = StyleSheet.create({
 	disconnectedText: {
 		color: "#F44336",
 		fontWeight: "bold",
-	},
-	debugSectionTitle: {
-		color: "#BBDEFB",
-		fontSize: 14,
-		fontWeight: "bold",
-		marginTop: 10,
-		marginBottom: 5,
-	},
-	debugUrlItem: {
-		color: "white",
-		fontSize: 12,
-		paddingVertical: 2,
 	},
 	debugButtonRow: {
 		flexDirection: "row",
