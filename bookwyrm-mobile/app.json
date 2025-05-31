@@ -1,7 +1,47 @@
 {
-  "expo": {
-    "name": "bookwyrm-mobile",
-    "slug": "bookwyrm-mobile",
-    "version": "1.0.0"
-  }
+	"expo": {
+		"name": "BookWyrm",
+		"slug": "bookwyrm-mobile",
+		"version": "1.0.0",
+		"orientation": "portrait",
+		"icon": "./assets/icon.png",
+		"userInterfaceStyle": "light",
+		"splash": {
+			"image": "./assets/splash.png",
+			"resizeMode": "contain",
+			"backgroundColor": "#ffffff"
+		},
+		"assetBundlePatterns": ["**/*"],
+		"ios": {
+			"supportsTablet": true,
+			"infoPlist": {
+				"NSPhotoLibraryUsageDescription": "The app uses your photo library to upload book covers and personal reading photos.",
+				"NSCameraUsageDescription": "The app uses your camera to take photos of your books."
+			}
+		},
+		"android": {
+			"adaptiveIcon": {
+				"foregroundImage": "./assets/adaptive-icon.png",
+				"backgroundColor": "#ffffff"
+			},
+			"permissions": [
+				"CAMERA",
+				"READ_EXTERNAL_STORAGE",
+				"WRITE_EXTERNAL_STORAGE"
+			]
+		},
+		"web": {
+			"favicon": "./assets/favicon.png"
+		},
+		"plugins": [
+			[
+				"expo-image-picker",
+				{
+					"photosPermission": "The app accesses your photos to let you share them with your friends.",
+					"cameraPermission": "The app accesses your camera to let you take photos of your books."
+				}
+			]
+		],
+		"entryPoint": "./index.js"
+	}
 }
