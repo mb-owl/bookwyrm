@@ -56,10 +56,10 @@ BookWyrm is a comprehensive book management system that allows users to track th
 ### App Screenshots
 
 <div align="center">
-  <img src="resources/README_images/IMG_1453.PNG" alt="Book Library" width="200" style="margin: 10px" />
-  <img src="resources/README_images/IMG_1454.PNG" alt="Book Details" width="200" style="margin: 10px" />
-  <img src="resources/README_images/IMG_1455.PNG" alt="Reading Progress" width="200" style="margin: 10px" />
-  <img src="resources/README_images/IMG_1456.PNG" alt="Statistics" width="200" style="margin: 10px" />
+  <img src="README_images/IMG_1453.PNG" alt="Book Library" width="200" style="margin: 10px" />
+  <img src="README_images/IMG_1454.PNG" alt="Book Details" width="200" style="margin: 10px" />
+  <img src="README_images/IMG_1455.PNG" alt="Reading Progress" width="200" style="margin: 10px" />
+  <img src="README_images/IMG_1456.PNG" alt="Statistics" width="200" style="margin: 10px" />
 </div>
 
 Key Features:
@@ -163,8 +163,8 @@ npm start
 1. **Book Management**
 
    <div align="center">
-     <img src="resources/README_images/IMG_1457.PNG" alt="Add Book" width="200" style="margin: 10px" />
-     <img src="resources/README_images/IMG_1458.PNG" alt="Book Collection" width="200" style="margin: 10px" />
+     <img src="README_images/IMG_1457.PNG" alt="Add Book" width="200" style="margin: 10px" />
+     <img src="README_images/IMG_1458.PNG" alt="Book Collection" width="200" style="margin: 10px" />
    </div>
 
    - Add books to your collection
@@ -174,8 +174,8 @@ npm start
 2. **Reading Tracking**
 
    <div align="center">
-     <img src="resources/README_images/IMG_1459.PNG" alt="Reading Progress" width="200" style="margin: 10px" />
-     <img src="resources/README_images/IMG_1460.PNG" alt="Reading Goals" width="200" style="margin: 10px" />
+     <img src="README_images/IMG_1459.PNG" alt="Reading Progress" width="200" style="margin: 10px" />
+     <img src="README_images/IMG_1460.PNG" alt="Reading Goals" width="200" style="margin: 10px" />
    </div>
 
    - Mark books as read/currently reading
@@ -185,8 +185,8 @@ npm start
 3. **Mobile Features**
 
    <div align="center">
-     <img src="resources/README_images/IMG_1461.PNG" alt="Barcode Scanner" width="200" style="margin: 10px" />
-     <img src="resources/README_images/IMG_1462.PNG" alt="Statistics Dashboard" width="200" style="margin: 10px" />
+     <img src="README_images/IMG_1461.PNG" alt="Barcode Scanner" width="200" style="margin: 10px" />
+     <img src="README_images/IMG_1462.PNG" alt="Statistics Dashboard" width="200" style="margin: 10px" />
    </div>
 
    - Scan book barcodes
@@ -250,4 +250,4 @@ Don't forget to give the project a star! Thanks again!
 
 <!-- MARKDOWN LINKS & IMAGES -->
 
-[product-screenshot]: resources/README_images/IMG_1453.PNG
+[product-screenshot]: README_images/IMG_1453.PNG
