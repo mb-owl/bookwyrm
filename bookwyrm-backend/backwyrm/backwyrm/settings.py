@@ -44,7 +44,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # Keep this at the top
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -126,8 +126,8 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Ensure CORS is properly configured
-CORS_ALLOW_ALL_ORIGINS = True if DEBUG else False
+# Ensure CORS is properly configured for development
+CORS_ALLOW_ALL_ORIGINS = True  # This is the key setting we need
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
     'DELETE',
@@ -149,13 +149,17 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
+# We don't need CORS_ALLOWED_ORIGINS when CORS_ALLOW_ALL_ORIGINS is True
+# But keeping it for production configuration
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    # Add your Expo development server if needed
     "http://localhost:19000",
     "http://localhost:19001",
     "http://localhost:19002",
+    "http://localhost:19006",  # Web browser
+    "exp://localhost:19000",   # Expo Go
+    "exp://127.0.0.1:19000",  # Expo Go alternative
 ]
 
 # Make sure Django serves media files in development
