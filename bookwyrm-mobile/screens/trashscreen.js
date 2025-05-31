@@ -97,7 +97,11 @@ export default function TrashScreen({ navigation }) {
 			setRestoring(true);
 			console.log("Attempting to restore book:", book.id, book.title);
 
+			// Construct the endpoint properly ensuring it has the correct format
+			// Django REST Framework often requires trailing slashes
 			const endpoint = getApiEndpoint(`books/${book.id}/restore`);
+			console.log("Using restore endpoint:", endpoint);
+
 			const response = await fetch(endpoint, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -111,11 +115,14 @@ export default function TrashScreen({ navigation }) {
 				try {
 					const errorData = await response.json();
 					errorText = errorData.detail || JSON.stringify(errorData);
+					console.error("Server returned JSON error:", errorText);
 				} catch (e) {
 					try {
 						errorText = await response.text();
+						console.error("Server returned text error:", errorText);
 					} catch (e2) {
 						errorText = `HTTP error ${response.status}`;
+						console.error("Could not parse error response");
 					}
 				}
 				throw new Error(`Failed to restore book: ${errorText}`);
@@ -136,21 +143,28 @@ export default function TrashScreen({ navigation }) {
 				[
 					{
 						text: "View Book",
-						onPress: () =>
+						onPress: () => {
+							console.log("Navigating to book detail:", restoredBook);
 							navigation.navigate("BookDetailScreen", {
 								book: restoredBook,
 								restored: true,
-							}),
+							});
+						},
 					},
 					{
 						text: "Go to Library",
-						onPress: () =>
+						onPress: () => {
+							console.log(
+								"Navigating to book list with restored book ID:",
+								book.id
+							);
 							navigation.navigate("BookListScreen", {
 								refresh: Date.now(),
 								restored: true,
 								restoredBookId: book.id,
 								forceDelay: true,
-							}),
+							});
+						},
 						style: "default",
 					},
 				]

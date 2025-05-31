@@ -141,9 +141,23 @@ class Book(models.Model):
         
     def restore(self):
         """Restore a deleted book"""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Restoring book {self.id}: {self.title}")
+        
+        if not self.is_deleted:
+            logger.warning(f"Attempted to restore book {self.id} that is not deleted")
+            return False
+            
         self.is_deleted = False
         self.deleted_at = None
         self.save()
+        
+        # Verify the restoration was successful
+        self.refresh_from_db()
+        success = not self.is_deleted
+        logger.info(f"Book {self.id} restoration {'successful' if success else 'failed'}")
+        return success
     
     @property
     def days_until_permanent_deletion(self):

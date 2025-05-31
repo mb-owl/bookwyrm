@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
 from datetime import date, datetime, timedelta
 from rest_framework import viewsets, status
@@ -81,8 +81,15 @@ class BookViewSet(viewsets.ModelViewSet):
                 )
             
             # Restore the book
-            book.restore()
-            logger.info(f"Book {pk} restored successfully")
+            restore_success = book.restore()
+            logger.info(f"Book {pk} restore operation result: {restore_success}")
+            
+            if not restore_success:
+                logger.error(f"Book {pk} restoration failed")
+                return Response(
+                    {"detail": "Failed to restore the book."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
             
             # Get fresh book data after restoration
             book.refresh_from_db()

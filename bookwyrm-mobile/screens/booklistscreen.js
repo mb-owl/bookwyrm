@@ -51,6 +51,33 @@ export default function BookListScreen({ route, navigation }) {
 				// If we have a restored book ID, find and highlight it
 				if (route.params?.restored && route.params?.restoredBookId) {
 					console.log("Restored book ID:", route.params.restoredBookId);
+					// Find the restored book in the list and highlight it
+					const restoredBookId = parseInt(route.params.restoredBookId);
+					const restoredBookIndex = books.findIndex(
+						(book) => book.id === restoredBookId
+					);
+
+					if (restoredBookIndex !== -1) {
+						console.log("Found restored book at index:", restoredBookIndex);
+						// Set a temporary highlight for this book
+						const updatedBooks = [...books];
+						updatedBooks[restoredBookIndex] = {
+							...updatedBooks[restoredBookIndex],
+							_justRestored: true,
+						};
+						setBooks(updatedBooks);
+
+						// Remove the highlight after a few seconds
+						setTimeout(() => {
+							const currentBooks = [...books];
+							if (currentBooks[restoredBookIndex]) {
+								delete currentBooks[restoredBookIndex]._justRestored;
+								setBooks(currentBooks);
+							}
+						}, 3000);
+					} else {
+						console.log("Could not find restored book in list");
+					}
 				}
 			} catch (error) {
 				console.error("Error loading books:", error);
@@ -732,6 +759,7 @@ export default function BookListScreen({ route, navigation }) {
 				styles.item,
 				selectedBooks.some((book) => book.id === item.id) &&
 					styles.selectedItem,
+				item._justRestored && styles.restoredItem,
 			]}
 			onPress={() => {
 				if (selectionMode) {
@@ -778,6 +806,7 @@ export default function BookListScreen({ route, navigation }) {
 				styles.thumbnailItem,
 				selectedBooks.some((book) => book.id === item.id) &&
 					styles.selectedItem,
+				item._justRestored && styles.restoredItem,
 			]}
 			onPress={() => {
 				if (selectionMode) {
@@ -1182,6 +1211,11 @@ const styles = StyleSheet.create({
 	},
 	selectedItem: {
 		backgroundColor: "rgba(0, 123, 255, 0.1)",
+	},
+	restoredItem: {
+		backgroundColor: "rgba(46, 204, 113, 0.2)", // Light green background
+		borderLeftWidth: 4,
+		borderLeftColor: "#2ecc71", // Green border
 	},
 	selectionBar: {
 		position: "absolute",
