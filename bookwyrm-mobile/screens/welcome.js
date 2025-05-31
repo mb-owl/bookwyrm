@@ -31,7 +31,7 @@ export default function WelcomeScreen({ navigation }) {
 		navigation.setOptions({
 			headerLeft: () => <HamburgerMenu />,
 			headerShown: true,
-			title: "BookWyrm",
+			title: "",
 		});
 	}, [navigation]);
 
