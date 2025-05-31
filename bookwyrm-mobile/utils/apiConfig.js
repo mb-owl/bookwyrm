@@ -68,7 +68,10 @@ const getDeviceIp = async () => {
 const determineApiHost = async () => {
 	// 1. Priority 1: Use IP from Expo configuration if available
 	const expoHostIp = getExpoHostIp();
-	if (expoHostIp) return expoHostIp;
+	if (expoHostIp) {
+		console.log("Using Expo host IP:", expoHostIp);
+		return expoHostIp;
+	}
 
 	// 2. For iOS simulator: Use localhost
 	if (Platform.OS === "ios" && !Platform.isDevice) {
@@ -82,17 +85,19 @@ const determineApiHost = async () => {
 		return "10.0.2.2";
 	}
 
-	// 4. For physical devices on same network, use computer's network IP
-	// You need to set your computer's IP here for physical device testing
-	// Get this from System Preferences > Network or by running 'ipconfig' on Windows
-	// or 'ifconfig' on macOS/Linux
-	const COMPUTER_NETWORK_IP = "192.168.0.57"; // ← REPLACE WITH YOUR COMPUTER'S IP
+	// 4. For physical devices on same network, use a list of potential IPs
+	// Add all your network interface IPs here
+	const POTENTIAL_NETWORK_IPS = [
+		"192.168.0.57", // Your primary WiFi
+		"10.0.0.1", // Alternative network
+		"172.20.10.1", // Hotspot
+		"0.0.0.0", // Allow any IP (when running Django with 0.0.0.0 binding)
+	];
+
 	if (Platform.isDevice) {
-		console.log(
-			"Using computer's network IP for physical device:",
-			COMPUTER_NETWORK_IP
-		);
-		return COMPUTER_NETWORK_IP;
+		console.log("Using multiple potential IPs for physical device");
+		// We'll still return the first one, but we'll try all of them in findWorkingApiUrl
+		return POTENTIAL_NETWORK_IPS[0];
 	}
 
 	// 5. Default fallback
@@ -104,6 +109,7 @@ const determineApiHost = async () => {
 let API_HOST = "127.0.0.1"; // Fixed: removed incorrect path from host
 let BASE_API_URL = `http://${API_HOST}:${API_PORT}/api`;
 let API_BOOKS_ENDPOINT = `http://${API_HOST}:${API_PORT}/api/books/`;
+let POTENTIAL_NETWORK_IPS = [];
 
 // Define potential API URLs to try in order of preference
 let API_URLS = [];
@@ -118,25 +124,54 @@ const initApiConfig = async () => {
 		BASE_API_URL = `http://${API_HOST}:${API_PORT}/api`;
 		API_BOOKS_ENDPOINT = `http://${API_HOST}:${API_PORT}/api/books/`;
 
+		// Define all potential network IPs to try - crucial for unrestricted access
+		POTENTIAL_NETWORK_IPS = [
+			"192.168.0.57", // Your primary WiFi
+			"10.0.0.1", // Alternative network
+			"172.20.10.1", // Hotspot
+			"0.0.0.0", // Allow any IP
+			"localhost", // For simulators
+			"127.0.0.1", // Local loopback
+			"10.0.2.2", // Android emulator
+		];
+
+		// Add the Expo IP if available
+		const expoIp = getExpoHostIp();
+		if (expoIp && !POTENTIAL_NETWORK_IPS.includes(expoIp)) {
+			POTENTIAL_NETWORK_IPS.unshift(expoIp);
+		}
+
 		// Generate a list of URLs to try in order of preference
 		API_URLS = [
 			// Current host determined by the app
 			`http://${API_HOST}:${API_PORT}/api`,
+		];
 
-			// iOS simulator specific
+		// Add URLs for all potential IPs
+		POTENTIAL_NETWORK_IPS.forEach((ip) => {
+			const url = `http://${ip}:${API_PORT}/api`;
+			if (!API_URLS.includes(url)) {
+				API_URLS.push(url);
+			}
+		});
+
+		// Also add these standard URLs
+		const standardUrls = [
 			"http://localhost:8000/api",
-
-			// Android emulator specific
 			"http://10.0.2.2:8000/api",
-
-			// Common local development
 			"http://127.0.0.1:8000/api",
 		];
+
+		standardUrls.forEach((url) => {
+			if (!API_URLS.includes(url)) {
+				API_URLS.push(url);
+			}
+		});
 
 		// Log the configuration
 		console.log("API Host:", API_HOST);
 		console.log("Base API URL:", BASE_API_URL);
-		console.log("Available API URLs:", API_URLS);
+		console.log("Available API URLs to try:", API_URLS);
 
 		// Return true on success
 		return true;
@@ -239,7 +274,10 @@ export const findWorkingApiUrl = async () => {
 
 			const response = await fetch(testUrl, {
 				method: "GET",
-				headers: { Accept: "application/json" },
+				headers: {
+					Accept: "application/json",
+					"Cache-Control": "no-cache",
+				},
 				signal: controller.signal,
 			});
 
@@ -256,11 +294,19 @@ export const findWorkingApiUrl = async () => {
 				return url;
 			}
 		} catch (error) {
-			console.log(`❌ URL failed: ${url}`);
+			console.log(`❌ URL failed: ${url}`, error.message ? error.message : "");
 		}
 	}
 
-	console.log("No working URLs found");
+	console.log("No working URLs found. Here's how to fix this:");
+	console.log(
+		"1. Make sure your Django server is running with: python manage.py runserver 0.0.0.0:8000"
+	);
+	console.log("2. Ensure your phone and computer are on the same WiFi network");
+	console.log(
+		"3. Check if your computer's firewall is blocking connections on port 8000"
+	);
+	console.log("4. Try using the Expo tunnel feature: npx expo start --tunnel");
 	return null;
 };
 
