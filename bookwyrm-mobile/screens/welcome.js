@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getApiEndpoint, testApiConnection } from "../utils/apiConfig";
+import { getApiEndpoint } from "../utils/apiConfig";
 import HamburgerMenu from "../components/HamburgerMenu";
 
 export default function WelcomeScreen({ navigation }) {
@@ -25,7 +25,6 @@ export default function WelcomeScreen({ navigation }) {
 	const [bookOfTheDayLoading, setBookOfTheDayLoading] = useState(false);
 	const [bookOfTheDayError, setBookOfTheDayError] = useState(null);
 	const [bookWidgetVisible, setBookWidgetVisible] = useState(true);
-	const [isConnected, setIsConnected] = useState(null);
 
 	// Setup navigation
 	useEffect(() => {
@@ -33,9 +32,6 @@ export default function WelcomeScreen({ navigation }) {
 			headerLeft: () => <HamburgerMenu />,
 			headerShown: false,
 		});
-
-		// Check API connection on mount
-		checkConnection();
 	}, [navigation]);
 
 	// Initialize Book of the Day
@@ -56,17 +52,6 @@ export default function WelcomeScreen({ navigation }) {
 			checkReadToday();
 		}, [])
 	);
-
-	// Function to check API connection
-	const checkConnection = async () => {
-		try {
-			const connected = await testApiConnection();
-			setIsConnected(connected);
-		} catch (error) {
-			console.error("Connection test error:", error);
-			setIsConnected(false);
-		}
-	};
 
 	// Check if user has recorded reading today
 	const checkReadToday = async () => {
@@ -518,17 +503,6 @@ export default function WelcomeScreen({ navigation }) {
 					>
 						<Text style={styles.mainButtonText}>Recently Deleted</Text>
 					</TouchableOpacity>
-
-					{/* Connection Test Button */}
-					<TouchableOpacity
-						style={styles.connectionTestButton}
-						onPress={() => navigation.navigate("ConnectionTest")}
-					>
-						<Text style={styles.connectionTestButtonText}>
-							Test API Connection
-							{isConnected !== null && (isConnected ? " ✓" : " ✗")}
-						</Text>
-					</TouchableOpacity>
 				</View>
 
 				{/* Book of the Day Widget */}
@@ -697,18 +671,5 @@ const styles = StyleSheet.create({
 	},
 	retryButtonText: {
 		color: "white",
-	},
-	connectionTestButton: {
-		backgroundColor: "#2196F3",
-		paddingVertical: 12,
-		paddingHorizontal: 20,
-		borderRadius: 5,
-		marginTop: 10,
-		alignSelf: "center",
-	},
-	connectionTestButtonText: {
-		color: "white",
-		fontWeight: "bold",
-		fontSize: 14,
 	},
 });
