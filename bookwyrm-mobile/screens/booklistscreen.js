@@ -24,6 +24,7 @@ export default function BookListScreen({ route, navigation }) {
 	const [searchQuery, setSearchQuery] = useState("");
 	const [sortKey, setSortKey] = useState("date"); // default sort by date
 	const [showSortModal, setShowSortModal] = useState(false); // New state for sort modal
+	const [viewMode, setViewMode] = useState("list"); // 'list' or 'thumbnail'
 	const { book, refresh } = route.params || {}; // book object and refresh flag passed from list
 
 	// Enhanced useEffect for better restoration handling
@@ -61,19 +62,21 @@ export default function BookListScreen({ route, navigation }) {
 		loadBooks();
 	}, [route.params?.refresh]); // This will re-run when the refresh parameter changes
 
-	// Add this to ensure our custom header is respected
+	// Setup navigation header
 	useEffect(() => {
-		// Update to include both hamburger menu on left and home button on right
+		// Update to include hamburger menu on left and home button on right
 		navigation.setOptions({
 			headerLeft: () => <HamburgerMenu />,
 			headerRight: () => (
-				<TouchableOpacity
-					style={styles.homeButton}
-					onPress={() => navigation.navigate("WelcomeScreen")}
-					accessibilityLabel="Go to home screen"
-				>
-					<Text style={styles.homeButtonText}>🏠</Text>
-				</TouchableOpacity>
+				<View style={styles.headerRightContainer}>
+					<TouchableOpacity
+						style={styles.homeButton}
+						onPress={() => navigation.navigate("WelcomeScreen")}
+						accessibilityLabel="Go to home screen"
+					>
+						<Text style={styles.homeButtonText}>🏠</Text>
+					</TouchableOpacity>
+				</View>
 			),
 		});
 	}, [navigation]);
@@ -722,8 +725,8 @@ export default function BookListScreen({ route, navigation }) {
 		);
 	};
 
-	// Render for FlatList items
-	const renderItem = ({ item }) => (
+	// Render for FlatList items - List View
+	const renderListItem = ({ item }) => (
 		<TouchableOpacity
 			style={[
 				styles.item,
@@ -764,6 +767,79 @@ export default function BookListScreen({ route, navigation }) {
 					<Text style={styles.title}>{item.title}</Text>
 					<Text style={styles.author}>{item.author}</Text>
 				</View>
+			</View>
+		</TouchableOpacity>
+	);
+
+	// Render for FlatList items - Thumbnail View
+	const renderThumbnailItem = ({ item }) => (
+		<TouchableOpacity
+			style={[
+				styles.thumbnailItem,
+				selectedBooks.some((book) => book.id === item.id) &&
+					styles.selectedItem,
+			]}
+			onPress={() => {
+				if (selectionMode) {
+					toggleBookSelection(item);
+				} else {
+					openBookDetail(item);
+				}
+			}}
+			onLongPress={() => {
+				if (!selectionMode) {
+					setSelectionMode(true);
+					toggleBookSelection(item);
+				}
+			}}
+			accessible={true}
+			accessibilityLabel={`Book: ${item.title}`}
+		>
+			{selectionMode && (
+				<View
+					style={[
+						styles.thumbnailCheckbox,
+						selectedBooks.some((book) => book.id === item.id) &&
+							styles.checkboxSelected,
+					]}
+				>
+					{selectedBooks.some((book) => book.id === item.id) && (
+						<Text style={styles.checkmark}>✓</Text>
+					)}
+				</View>
+			)}
+
+			{/* Book Cover or Emoji */}
+			{item.cover ? (
+				<Image
+					source={{
+						uri: item.cover.startsWith("http")
+							? item.cover
+							: `${getMediaUrl()}covers/${item.cover.split("/").pop()}`,
+					}}
+					style={styles.thumbnailCover}
+					resizeMode="cover"
+					accessible={true}
+					accessibilityLabel={`Cover image of ${item.title}`}
+					onError={(e) =>
+						console.error("Image load error:", e.nativeEvent.error)
+					}
+				/>
+			) : (
+				<View style={styles.thumbnailPlaceholder}>
+					<Text style={styles.thumbnailPlaceholderEmoji}>
+						{item.emoji || "📚"}
+					</Text>
+				</View>
+			)}
+
+			<View style={styles.thumbnailContent}>
+				<Text style={styles.thumbnailTitle} numberOfLines={1}>
+					{item.title}
+				</Text>
+				<Text style={styles.thumbnailAuthor} numberOfLines={1}>
+					{item.author}
+				</Text>
 			</View>
 		</TouchableOpacity>
 	);
@@ -874,17 +950,65 @@ export default function BookListScreen({ route, navigation }) {
 		);
 	};
 
-	// Replace the sort row with a button to open the sort modal
+	// Replace the sort row with a button to open the sort modal and view toggle
 	const renderSortButton = () => (
-		<View style={styles.sortButtonContainer}>
-			<Text style={styles.sortLabel}>Sort by:</Text>
-			<TouchableOpacity
-				style={styles.sortButton}
-				onPress={() => setShowSortModal(true)}
-			>
-				<Text style={styles.sortButtonText}>{getSortDisplayName()}</Text>
-				<Text style={styles.sortButtonIcon}>▼</Text>
-			</TouchableOpacity>
+		<View style={styles.sortControlsContainer}>
+			<View style={styles.sortButtonWrapper}>
+				<Text style={styles.sortLabel}>Sort by:</Text>
+				<TouchableOpacity
+					style={styles.sortButton}
+					onPress={() => setShowSortModal(true)}
+				>
+					<Text style={styles.sortButtonText}>{getSortDisplayName()}</Text>
+					<Text style={styles.sortButtonIcon}>▼</Text>
+				</TouchableOpacity>
+			</View>
+
+			<View style={styles.viewToggleWrapper}>
+				<Text style={styles.sortLabel}>View:</Text>
+				<View style={styles.iconToggleContainer}>
+					<TouchableOpacity
+						style={[
+							styles.iconToggleButton,
+							viewMode === "list"
+								? styles.iconToggleButtonInactive
+								: styles.iconToggleButtonActive,
+						]}
+						onPress={() => setViewMode("thumbnail")}
+						accessibilityLabel="Switch to thumbnail view"
+					>
+						<Text
+							style={[
+								styles.viewToggleIcon,
+								viewMode !== "list" ? { color: "#fff" } : { color: "#333" },
+							]}
+						>
+							🖼️
+						</Text>
+					</TouchableOpacity>
+					<TouchableOpacity
+						style={[
+							styles.iconToggleButton,
+							viewMode === "thumbnail"
+								? styles.iconToggleButtonInactive
+								: styles.iconToggleButtonActive,
+						]}
+						onPress={() => setViewMode("list")}
+						accessibilityLabel="Switch to list view"
+					>
+						<Text
+							style={[
+								styles.viewToggleIcon,
+								viewMode !== "thumbnail"
+									? { color: "#fff" }
+									: { color: "#333" },
+							]}
+						>
+							📋
+						</Text>
+					</TouchableOpacity>
+				</View>
+			</View>
 		</View>
 	);
 
@@ -924,9 +1048,16 @@ export default function BookListScreen({ route, navigation }) {
 			) : (
 				<FlatList
 					data={books}
-					renderItem={renderItem}
+					renderItem={
+						viewMode === "list" ? renderListItem : renderThumbnailItem
+					}
 					keyExtractor={(item) => item.id.toString()}
 					style={[styles.bookList, selectionMode && styles.selectionModeList]}
+					numColumns={viewMode === "thumbnail" ? 3 : 1}
+					key={viewMode} // Force remount when view mode changes
+					columnWrapperStyle={
+						viewMode === "thumbnail" ? styles.thumbnailRow : null
+					}
 				/>
 			)}
 
@@ -1163,19 +1294,23 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		marginRight: 8,
 		color: "#666",
+		flexShrink: 0,
 	},
 	sortButton: {
 		flexDirection: "row",
 		alignItems: "center",
 		backgroundColor: "#f0f0f0",
-		paddingHorizontal: 12,
+		paddingHorizontal: 10,
 		paddingVertical: 6,
 		borderRadius: 4,
+		flexShrink: 1,
 	},
 	sortButtonText: {
 		fontSize: 14,
 		color: "#007BFF",
 		fontWeight: "500",
+		flexShrink: 1,
+		marginRight: 4,
 	},
 	sortButtonIcon: {
 		fontSize: 12,
@@ -1226,5 +1361,96 @@ const styles = StyleSheet.create({
 	},
 	homeButtonText: {
 		fontSize: 24, // Increased size for better visibility
+	},
+	headerRightContainer: {
+		flexDirection: "row",
+		alignItems: "center",
+	},
+	viewModeButton: {
+		padding: 8,
+	},
+	viewModeIcon: {
+		fontSize: 18,
+		color: "#007BFF",
+	},
+	// New styles for the view controls
+	sortControlsContainer: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "space-between",
+		marginVertical: 10,
+		paddingHorizontal: 8,
+		borderBottomWidth: 1,
+		borderBottomColor: "#e0e0e0",
+		paddingBottom: 10,
+	},
+	sortButtonWrapper: {
+		flexDirection: "row",
+		alignItems: "center",
+		flex: 1,
+		maxWidth: "50%",
+	},
+	viewToggleWrapper: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "flex-end",
+		flex: 1,
+	},
+	viewToggleButton: {
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: "#f0f0f0",
+		paddingHorizontal: 10,
+		paddingVertical: 6,
+		borderRadius: 4,
+		flexShrink: 1,
+	},
+	viewToggleText: {
+		color: "#333",
+		marginRight: 4,
+		fontSize: 14,
+		flexShrink: 1,
+	},
+	viewToggleIcon: {
+		fontSize: 20,
+		textAlign: "center",
+	},
+	// New styles for icon toggle
+	iconToggleContainer: {
+		flexDirection: "row",
+		backgroundColor: "#f0f0f0",
+		borderRadius: 4,
+		overflow: "hidden",
+		borderWidth: 1,
+		borderColor: "#ddd",
+	},
+	iconToggleButton: {
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		alignItems: "center",
+		justifyContent: "center",
+		minWidth: 44,
+	},
+	iconToggleButtonActive: {
+		backgroundColor: "#007BFF",
+	},
+	iconToggleButtonInactive: {
+		backgroundColor: "#f0f0f0",
+	},
+	// Updated styles for thumbnail view
+	thumbnailItem: {
+		flex: 1,
+		flexDirection: "column",
+		alignItems: "center",
+		padding: 10,
+		margin: 4,
+		maxWidth: "33%",
+	},
+	thumbnailRow: {
+		flex: 1,
+		justifyContent: "flex-start",
+	},
+	thumbnailPlaceholderEmoji: {
+		fontSize: 40,
 	},
 });

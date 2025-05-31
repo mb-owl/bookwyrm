@@ -30,7 +30,8 @@ export default function WelcomeScreen({ navigation }) {
 	useEffect(() => {
 		navigation.setOptions({
 			headerLeft: () => <HamburgerMenu />,
-			headerShown: false,
+			headerShown: true,
+			title: "BookWyrm",
 		});
 	}, [navigation]);
 
@@ -466,13 +467,15 @@ export default function WelcomeScreen({ navigation }) {
 	return (
 		<SafeAreaView style={styles.container}>
 			<ScrollView style={styles.scrollView}>
-				{/* Welcome Header */}
-				<View style={styles.header}>
-					<Text style={styles.welcomeTitle}>Welcome to BookWyrm</Text>
-					<Text style={styles.welcomeSubtitle}>
-						Your personal book companion
-					</Text>
-				</View>
+				{/* Welcome Header - only show on screens without navbar */}
+				{!navigation.getParent()?.getCurrentOptions?.()?.headerShown && (
+					<View style={styles.header}>
+						<Text style={styles.welcomeTitle}>Welcome to BookWyrm</Text>
+						<Text style={styles.welcomeSubtitle}>
+							Your personal book companion
+						</Text>
+					</View>
+				)}
 
 				{/* Main Navigation Buttons */}
 				<View style={styles.buttonsContainer}>
@@ -488,20 +491,6 @@ export default function WelcomeScreen({ navigation }) {
 						onPress={() => navigation.navigate("BookFormScreen")}
 					>
 						<Text style={styles.mainButtonText}>Add New Book</Text>
-					</TouchableOpacity>
-
-					<TouchableOpacity
-						style={styles.mainButton}
-						onPress={() => navigation.navigate("Favorites")}
-					>
-						<Text style={styles.mainButtonText}>Favorites</Text>
-					</TouchableOpacity>
-
-					<TouchableOpacity
-						style={styles.mainButton}
-						onPress={() => navigation.navigate("Trash")}
-					>
-						<Text style={styles.mainButtonText}>Recently Deleted</Text>
 					</TouchableOpacity>
 				</View>
 

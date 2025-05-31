@@ -40,6 +40,12 @@ const HamburgerMenu = () => {
 				>
 					<View style={styles.menuContainer}>
 						<MenuItem
+							icon="🏠"
+							label="Home"
+							onPress={() => navigateTo("WelcomeScreen")}
+						/>
+
+						<MenuItem
 							icon="📚"
 							label="Book Library"
 							onPress={() => navigateTo("BookListScreen")}
@@ -107,8 +113,9 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: "rgba(0, 0, 0, 0.5)",
 		justifyContent: "flex-start",
-		alignItems: "center",
+		alignItems: "flex-start",
 		paddingTop: 50,
+		paddingLeft: 15,
 	},
 	menuContainer: {
 		width: "75%",
